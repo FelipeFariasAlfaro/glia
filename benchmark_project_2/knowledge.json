@@ -1,0 +1,109 @@
+{
+  "multi_hop_questions": [
+    {
+      "question": "What happens if a new feature is added to training but not to the drift detector?",
+      "expected_concepts": ["drift_detector", "model_config", "FEATURE_LIST", "silent_degradation", "MONITORED_FEATURES"],
+      "answer": "The drift detector imports MONITORED_FEATURES from model_config.FEATURE_LIST. If a feature is added to FEATURE_LIST, it will automatically be monitored. However, if someone adds a feature to training without adding it to FEATURE_LIST (or if the drift detector's import is overridden), drift in that feature goes undetected, causing silent model degradation without triggering any alerts."
+    },
+    {
+      "question": "Why did the 2024-06 model degradation go undetected by the validation pipeline?",
+      "expected_concepts": ["validation", "schema_validation", "statistical_checks", "NUMERIC", "FLOAT8", "data_contracts"],
+      "answer": "The validation pipeline only performed statistical checks (KS tests, null rates, value ranges) but did NOT validate column types/schema. When PostgreSQL changed the amount column from NUMERIC(10,2) to FLOAT8, the values looked statistically similar but introduced floating-point precision errors. The fix was adding schema validation via data_contracts.py."
+    },
+    {
+      "question": "How are the 2024-02 feature leak and 2024-06 model degradation incidents connected?",
+      "expected_concepts": ["feature_leak", "target_leakage", "model_degradation", "temporal_features", "precision_errors"],
+      "answer": "The 2024-02 feature leakage was masking the model's true sensitivity to data quality. With leakage present, the model was overfit to temporal patterns and small precision errors didn't matter. After the leakage fix, the model relied more on monetary features (avg_order_value, total_spend), making it vulnerable to the precision issues from the 2024-06 schema change. The leakage incident was only fully understood after investigating the degradation incident."
+    },
+    {
+      "question": "What could go wrong if the retraining pipeline runs within 4 hours of the daily pipeline?",
+      "expected_concepts": ["feature_store", "cache_TTL", "stale_features", "retraining_pipeline", "infra_config"],
+      "answer": "The feature store has a 4-hour cache TTL (configured in infra_config.py). If retraining runs before the cache expires after the daily pipeline writes new features, it may train on stale cached features from the previous day. The mitigation is that retraining_pipeline.py calls invalidate_cache() before training and uses force_refresh=True when reading features."
+    },
+    {
+      "question": "What happens if S3 clickstream data arrives after 6:00 AM UTC?",
+      "expected_concepts": ["S3_DATA_DEADLINE_UTC", "daily_pipeline", "ingestion", "incomplete_data", "fallback"],
+      "answer": "The daily pipeline starts at 6:15 AM UTC assuming S3 data has landed by 6:00 AM. If data arrives late, the ingestion module either uses a fallback to the previous day's data or proceeds with incomplete data. This means downstream features are computed on partial sessions, causing inaccurate feature values that can degrade model predictions without triggering explicit errors."
+    },
+    {
+      "question": "Why can't a model with excellent AUC be automatically promoted to production?",
+      "expected_concepts": ["evaluation", "fairness_checks", "registry", "promotion", "demographic_parity"],
+      "answer": "The model registry enforces a hard gate: promotion requires passing BOTH accuracy thresholds (AUC > 0.70) AND fairness checks (demographic parity ratio > 0.8, equalized odds difference < 0.1). A model can have excellent AUC but still fail fairness checks if it performs differently across demographic groups. This gate is non-negotiable in registry.py's promote_to_production()."
+    },
+    {
+      "question": "What must be done after every model promotion or rollback regarding alerts?",
+      "expected_concepts": ["alerts", "recalibrate_thresholds", "registry", "model_version", "score_distribution"],
+      "answer": "Alert thresholds in alerts.py are calibrated to the current model's prediction score distribution. After any model promotion or rollback, recalibrate_thresholds() must be called because a different model version will have a different score distribution. Without recalibration, thresholds may fire too many false alerts or miss real degradation."
+    },
+    {
+      "question": "What is the relationship between GPU memory and training batch size?",
+      "expected_concepts": ["infra_config", "MAX_GPU_MEMORY_GB", "TRAINING_BATCH_SIZE", "OOM", "MEMORY_PER_SAMPLE_MB"],
+      "answer": "TRAINING_BATCH_SIZE is derived from MAX_GPU_MEMORY_GB using the formula: int(MAX_GPU_MEMORY_GB * 1024 / MEMORY_PER_SAMPLE_MB). Currently 16GB * 1024 / 0.5 = 32768. Changing GPU memory without updating batch size, or vice versa, causes OOM errors during training. They must always be updated together."
+    },
+    {
+      "question": "How does the feature store cache TTL create a coupling between the daily pipeline and retraining?",
+      "expected_concepts": ["feature_store", "cache_TTL", "daily_pipeline", "retraining_pipeline", "invalidate_cache"],
+      "answer": "The daily pipeline writes new features to the feature store, but the read cache (4-hour TTL from infra_config.py) is NOT invalidated on write. If the retraining pipeline triggers within 4 hours, it reads stale cached features. The retraining pipeline mitigates this by explicitly calling invalidate_cache() and using force_refresh=True, but this creates a timing dependency between the two pipelines."
+    },
+    {
+      "question": "Why was auto-promotion disabled after the 2024-02 incident?",
+      "expected_concepts": ["auto_promote", "retraining_pipeline", "feature_leak", "human_review", "offline_metrics"],
+      "answer": "During the 2024-02 feature leakage incident, the model with inflated AUC (0.95 due to leakage) was auto-promoted without human review. The leakage made offline metrics look excellent while production performance was actually 0.72. After this incident, AUTO_PROMOTE was set to False in retraining_pipeline.py, requiring human approval before any model goes to production."
+    },
+    {
+      "question": "What is the full chain of events from a PostgreSQL schema change to model degradation?",
+      "expected_concepts": ["postgres", "schema_change", "validation", "feature_engineering", "precision", "model_degradation"],
+      "answer": "PostgreSQL schema change (NUMERIC->FLOAT8) -> ingestion loads data with new type -> validation passes (only statistical checks, no schema check) -> cleaning doesn't catch it (type cast may succeed) -> feature engineering computes aggregations with precision errors -> features written to store -> model predictions degrade over days -> AUC alert fires after threshold crossed. The fix was adding schema validation via data_contracts.py."
+    },
+    {
+      "question": "What happens if you change the serving instance from CPU to GPU without updating the model config?",
+      "expected_concepts": ["serving", "infra_config", "model_config", "FEATURE_LIST", "feature_ordering"],
+      "answer": "The serving endpoint (serving.py) reads features using FEATURE_LIST from model_config.py and creates an XGBoost DMatrix. If the serving infrastructure changes but the feature list or model version isn't updated, predictions could fail or use wrong feature ordering. The served model version must match the feature list — XGBoost uses positional features, so order matters."
+    },
+    {
+      "question": "How does the drift detector's dependency on model_config create a maintenance burden?",
+      "expected_concepts": ["drift_detector", "model_config", "FEATURE_LIST", "MONITORED_FEATURES", "coupling"],
+      "answer": "The drift detector imports MONITORED_FEATURES directly from model_config.FEATURE_LIST, creating tight coupling. While this ensures they stay in sync automatically, it means any change to FEATURE_LIST immediately affects drift monitoring. If a feature is removed from FEATURE_LIST, drift detection stops for it. If a feature is added, drift detection starts but may not have a reference baseline yet, potentially causing false drift alerts."
+    },
+    {
+      "question": "What is the complete rollback procedure and why is each step necessary?",
+      "expected_concepts": ["registry", "rollback", "alerts", "recalibrate_thresholds", "prediction_cache", "serving"],
+      "answer": "Rollback procedure: 1) Archive current production model in registry, 2) Promote previous version back to production, 3) Invalidate prediction cache in serving.py (so stale predictions from old model aren't served), 4) Recalibrate alert thresholds in alerts.py (because the rolled-back model has a different score distribution). Missing step 4 causes false alerts or missed degradation."
+    },
+    {
+      "question": "Why might the model perform well in offline evaluation but poorly in production after the feature leak fix?",
+      "expected_concepts": ["feature_leak", "temporal_features", "training_serving_skew", "feature_store", "point_in_time"],
+      "answer": "After fixing the feature leak (strict temporal cutoff), the model's true AUC dropped from 0.95 to 0.78. If offline evaluation uses the same strict cutoff but production serving has any timing inconsistency (e.g., feature store cache serving slightly stale features, or features computed on incomplete S3 data), there can be a gap between offline and online performance. The feature store's point-in-time correctness helps, but cache staleness can still cause discrepancies."
+    },
+    {
+      "question": "What is the relationship between the S3 data deadline, daily pipeline schedule, and feature freshness?",
+      "expected_concepts": ["S3_DATA_DEADLINE_UTC", "daily_pipeline", "SCHEDULE", "feature_engineering", "feature_store"],
+      "answer": "S3 data must arrive by 6:00 AM UTC. The daily pipeline starts at 6:15 AM (15-minute buffer). If S3 data is late, the pipeline either uses previous day's fallback data or processes incomplete data. Features computed on incomplete data are written to the feature store and cached for 4 hours. Any downstream consumer (serving, retraining) that reads these features within the cache window gets degraded feature values."
+    },
+    {
+      "question": "How do data contracts prevent the type of issue that caused the 2024-06 incident?",
+      "expected_concepts": ["data_contracts", "validation", "schema_validation", "column_types", "POSTGRES_TRANSACTIONS_CONTRACT"],
+      "answer": "Data contracts (data_contracts.py) define explicit expected column types for each data source. The POSTGRES_TRANSACTIONS_CONTRACT specifies amount should be float64. validation.py's _validate_schema() checks actual column dtypes against the contract. If PostgreSQL changes amount from NUMERIC to FLOAT8, the contract check catches the type mismatch immediately (unlike statistical checks which would pass). This was added specifically after the 2024-06 incident."
+    },
+    {
+      "question": "What happens if alert thresholds are not recalibrated after a model with higher prediction scores is promoted?",
+      "expected_concepts": ["alerts", "ALERT_THRESHOLDS", "churn_score_mean_range", "false_alerts", "model_version"],
+      "answer": "If the new model produces higher churn scores on average, the churn_score_mean_range threshold (calibrated to the old model's distribution) will be exceeded, triggering false 'Churn Score Distribution Shift' alerts. Conversely, if the new model scores lower, real degradation might not trigger alerts because the threshold is set too high. The CALIBRATED_FOR_MODEL_VERSION field tracks which model the thresholds are tuned for."
+    },
+    {
+      "question": "Why was XGBoost chosen over deep learning and how does this affect infrastructure coupling?",
+      "expected_concepts": ["adr-001", "XGBoost", "GPU", "inference", "CPU", "infra_config", "batch_size"],
+      "answer": "XGBoost was chosen (ADR-001) for better interpretability, lower serving cost (CPU inference vs GPU), and comparable performance on tabular data. This creates a specific infrastructure coupling: training uses GPU (tree_method='gpu_hist') with batch size tied to GPU memory (infra_config.py), but serving runs on CPU (c5.2xlarge). The GPU coupling means TRAINING_BATCH_SIZE must match MAX_GPU_MEMORY_GB, but serving doesn't have this constraint."
+    },
+    {
+      "question": "How could adding a feature to model_config.py without updating data_contracts.py cause issues?",
+      "expected_concepts": ["model_config", "FEATURE_LIST", "data_contracts", "FEATURE_OUTPUT_CONTRACT", "validation"],
+      "answer": "The FEATURE_OUTPUT_CONTRACT in data_contracts.py defines expected columns in the feature engineering output. If a new feature is added to FEATURE_LIST but not to the contract's required_columns, the validation step won't verify that the new feature is actually being produced correctly. Additionally, if the feature depends on a new upstream column, the ingestion contract won't validate that column exists, potentially causing silent failures."
+    },
+    {
+      "question": "What is the full impact chain if someone upgrades the GPU instance type without updating infra_config.py?",
+      "expected_concepts": ["infra_config", "GPU", "TRAINING_BATCH_SIZE", "MAX_GPU_MEMORY_GB", "training", "OOM", "underutilization"],
+      "answer": "If GPU is upgraded (e.g., V100 16GB -> A100 40GB) without updating MAX_GPU_MEMORY_GB in infra_config.py: TRAINING_BATCH_SIZE remains at 32768 (calculated from 16GB), wasting 60% of the new GPU's capacity. Conversely, if MAX_GPU_MEMORY_GB is updated to 40 but the instance isn't actually upgraded, the batch size increases to 81920, causing OOM errors. The 2024-04 incident was exactly this: instance upgraded but config not updated, wasting capacity."
+    }
+  ]
+}

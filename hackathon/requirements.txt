@@ -1,0 +1,9 @@
+mcp
+google-genai
+python-dotenv
+langchain-google-genai
+langchain
+fastapi
+uvicorn
+python-multipart
+numpy

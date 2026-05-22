@@ -1,0 +1,266 @@
+{
+  "description": "Ground truth for GLIA benchmark - hidden relationships and multi-hop knowledge that should be discoverable through associative retrieval",
+  "multi_hop_questions": [
+    {
+      "id": "mh-001",
+      "question": "What happens if Redis goes down?",
+      "hops": 2,
+      "expected_concepts": ["rate_limiter", "auth_service", "session_store", "redis_connection", "inventory_service", "notification_service", "event_pub_sub"],
+      "answer": "Multiple systems break simultaneously: (1) Rate limiting fails OPEN (allows all requests), (2) Session validation fails CLOSED (users can't authenticate), (3) Inventory reservations fail (can't create orders), (4) Event pub/sub stops (notifications cease), (5) Email and webhook queues stop processing. This is because all these systems share the same Redis connection pool defined in database/connection.py.",
+      "source_files": ["src/database/connection.py", "src/middleware/rate_limiter.py", "src/services/auth_service.py", "src/services/inventory_service.py", "docs/architecture.md"]
+    },
+    {
+      "id": "mh-002",
+      "question": "What caused the March 2024 token leak and how was it fixed?",
+      "hops": 3,
+      "expected_concepts": ["crypto.py", "deterministic_iv", "aes_cbc", "auth_service", "token_rotation", "rs256"],
+      "answer": "The token leak was caused by a bug in src/utils/crypto.py where the encrypt_at_rest() function used a deterministic IV derived from session_id (hashlib.md5(session_id)). This meant the same session always produced identical ciphertext in Redis, enabling correlation attacks. The fix involved: (1) switching to random IV (os.urandom(16)) in crypto.py, (2) adding token rotation in auth_service.py, (3) reducing token expiry from 1h to 15min, (4) switching from HS256 to RS256 (ADR-001).",
+      "source_files": ["src/utils/crypto.py", "src/services/auth_service.py", "docs/incidents/2024-03-token-leak.md", "docs/decisions/adr-001-jwt-rs256.md"]
+    },
+    {
+      "id": "mh-003",
+      "question": "What caused the May 2024 double-charge bug?",
+      "hops": 3,
+      "expected_concepts": ["order_service", "payment_service", "race_condition", "advisory_lock", "idempotency_key"],
+      "answer": "A read-then-write race condition between order_service.py and payment_service.py. Two concurrent requests could both read 'order not yet charged' before either committed the charge. Fixed with three layers: (1) PostgreSQL advisory locks in order_service, (2) Stripe idempotency keys in payment_service, (3) Redis-level idempotency check before calling Stripe.",
+      "source_files": ["src/services/order_service.py", "src/services/payment_service.py", "src/models/order.py", "docs/incidents/2024-05-payment-double-charge.md", "src/database/migrations.py"]
+    },
+    {
+      "id": "mh-004",
+      "question": "How does the notification service know about order changes without importing order_service?",
+      "hops": 2,
+      "expected_concepts": ["event_driven", "redis_pub_sub", "notification_service", "order_service", "decoupling"],
+      "answer": "Through event-driven architecture (ADR-002). order_service publishes events to Redis pub/sub channel 'order_events' via _emit_event(). notification_service subscribes to this channel and processes events in handle_order_event(). There is no direct import or function call between them.",
+      "source_files": ["src/services/order_service.py", "src/services/notification_service.py", "docs/decisions/adr-002-event-driven.md"]
+    },
+    {
+      "id": "mh-005",
+      "question": "What happens when an order is cancelled?",
+      "hops": 4,
+      "expected_concepts": ["order_service", "inventory_service", "payment_service", "notification_service", "reservation_release", "refund"],
+      "answer": "Cancellation triggers a chain: (1) order_service.cancel_order() checks state machine allows cancellation (only pending/confirmed), (2) calls inventory_service.release_order_reservations() to free reserved stock, (3) if order was confirmed, calls payment_service.refund() to issue Stripe refund, (4) emits 'order.cancelled' event via Redis pub/sub, (5) notification_service picks up event and sends cancellation email + webhook.",
+      "source_files": ["src/services/order_service.py", "src/services/inventory_service.py", "src/services/payment_service.py", "src/services/notification_service.py", "src/models/order.py"]
+    },
+    {
+      "id": "mh-006",
+      "question": "Why was RS256 chosen over HS256 for JWT signing?",
+      "hops": 2,
+      "expected_concepts": ["adr_001", "token_leak", "rs256", "hs256", "key_separation"],
+      "answer": "RS256 was chosen after the March 2024 token leak incident because: (1) it separates signing (private key) from verification (public key), so compromising a verification service can't forge tokens, (2) key rotation is simpler since only the signer needs updating, (3) reduces blast radius of key compromise. The trade-off is ~10x slower signing and ~300 bytes larger tokens.",
+      "source_files": ["docs/decisions/adr-001-jwt-rs256.md", "docs/incidents/2024-03-token-leak.md", "src/utils/crypto.py"]
+    },
+    {
+      "id": "mh-007",
+      "question": "How does inventory reservation prevent overselling?",
+      "hops": 2,
+      "expected_concepts": ["inventory_service", "redis_reservation", "ttl", "order_service", "stock_calculation"],
+      "answer": "When an order is created, inventory_service.reserve_stock() creates a time-limited hold in Redis (15 min TTL). Available stock is calculated as total_stock minus active reservations. If the order isn't confirmed within TTL, the reservation auto-expires. On cancellation, order_service explicitly calls release_order_reservations(). The inventory_service doesn't know about order state - it only manages reservations by ID.",
+      "source_files": ["src/services/inventory_service.py", "src/services/order_service.py", "src/config/constants.py"]
+    },
+    {
+      "id": "mh-008",
+      "question": "What is the relationship between rate_limiter and auth_service?",
+      "hops": 2,
+      "expected_concepts": ["redis_shared_pool", "rate_limiter", "auth_service", "session_store", "single_point_of_failure"],
+      "answer": "Both rate_limiter and auth_service use the same Redis connection pool (from database/connection.py). rate_limiter uses Redis sorted sets for sliding window counting. auth_service uses Redis for session storage and token blacklisting. If Redis goes down, rate_limiter fails OPEN (allows all requests) while auth_service fails CLOSED (rejects all requests). This asymmetric failure mode is a deliberate design choice.",
+      "source_files": ["src/middleware/rate_limiter.py", "src/services/auth_service.py", "src/database/connection.py"]
+    },
+    {
+      "id": "mh-009",
+      "question": "How does token rotation detect token theft?",
+      "hops": 3,
+      "expected_concepts": ["auth_service", "refresh_token", "token_rotation", "session_redis", "terminate_all_sessions"],
+      "answer": "When a refresh token is used, auth_service.rotate_tokens() checks Redis for the session. If the session exists, it's deleted (one-time use) and new tokens are issued. If the session doesn't exist (token already used), it means someone else already rotated it — indicating theft. In that case, _terminate_all_sessions() kills ALL sessions for that user. This was added after the March 2024 incident.",
+      "source_files": ["src/services/auth_service.py", "docs/incidents/2024-03-token-leak.md", "src/models/user.py"]
+    },
+    {
+      "id": "mh-010",
+      "question": "What is the complete data flow when a customer places an order?",
+      "hops": 5,
+      "expected_concepts": ["order_route", "order_service", "inventory_service", "payment_service", "notification_service", "email_worker", "webhook_worker"],
+      "answer": "1. POST /orders hits orders.py route → validates items → calls order_service.create_order(). 2. order_service reserves inventory via inventory_service.reserve_stock() (sync). 3. order_service authorizes payment via payment_service.authorize() with idempotency key (sync). 4. Order persisted to PostgreSQL with 'pending' status. 5. 'order.created' event emitted to Redis pub/sub. 6. notification_service.handle_order_event() picks up event. 7. Notification queued to email_queue and webhook_queue in Redis. 8. email_worker sends confirmation email via SMTP. 9. webhook_worker delivers to registered endpoints with HMAC signature.",
+      "source_files": ["src/api/routes/orders.py", "src/services/order_service.py", "src/services/inventory_service.py", "src/services/payment_service.py", "src/services/notification_service.py", "src/workers/email_worker.py", "src/workers/webhook_worker.py"]
+    },
+    {
+      "id": "mh-011",
+      "question": "What happens if a webhook delivery permanently fails?",
+      "hops": 3,
+      "expected_concepts": ["webhook_worker", "exponential_backoff", "deactivation", "email_notification", "notification_service"],
+      "answer": "webhook_worker retries with exponential backoff (2^attempt seconds) up to 5 times. After 5 failures: (1) the webhook endpoint is deactivated in the database, (2) an email is queued to email_queue notifying the user their webhook was deactivated, (3) the failure is logged to webhook_deliveries table. The email about webhook failure is then processed by email_worker.",
+      "source_files": ["src/workers/webhook_worker.py", "src/workers/email_worker.py", "src/config/constants.py"]
+    },
+    {
+      "id": "mh-012",
+      "question": "How are passwords stored and what protections exist against brute force?",
+      "hops": 3,
+      "expected_concepts": ["bcrypt", "cost_factor_12", "rate_limiter", "account_lockout", "timing_safe"],
+      "answer": "Passwords are hashed with bcrypt (cost factor 12, ~250ms per hash) in crypto.py. Brute force is prevented by: (1) rate_limiter on login endpoint (5 attempts per minute per IP), (2) account lockout after 5 failed attempts (15 min lockout, tracked in user model), (3) constant-time comparison in verify_password() prevents timing attacks. The rate limiter uses Redis, so if Redis is down, rate limiting fails open but bcrypt's slowness still provides protection.",
+      "source_files": ["src/utils/crypto.py", "src/middleware/rate_limiter.py", "src/models/user.py", "src/config/constants.py", "src/api/routes/auth.py"]
+    },
+    {
+      "id": "mh-013",
+      "question": "What is the relationship between product stock and inventory reservations?",
+      "hops": 2,
+      "expected_concepts": ["product_model", "product_variant", "inventory_service", "redis_reservations", "available_stock"],
+      "answer": "Product stock is tracked at the variant level in PostgreSQL (product_variants.stock). However, this is 'total' stock. Real-time 'available' stock is calculated by inventory_service as: total_stock - active_reservations. Reservations are tracked in Redis with TTL. The product model's total_stock property doesn't account for reservations — you must use inventory_service.get_stock_levels() for accurate availability.",
+      "source_files": ["src/models/product.py", "src/services/inventory_service.py", "src/api/routes/products.py"]
+    },
+    {
+      "id": "mh-014",
+      "question": "What security measures protect the payment flow?",
+      "hops": 3,
+      "expected_concepts": ["advisory_lock", "idempotency_key", "stripe_webhook_signature", "payment_service", "order_service"],
+      "answer": "Multiple layers: (1) PostgreSQL advisory locks prevent concurrent payment for same order, (2) Application-level idempotency check in Redis before calling Stripe, (3) Stripe's own idempotency key enforcement, (4) Webhook signature verification (stripe.Webhook.construct_event) prevents spoofed payment events, (5) Payment audit trail in payment_records table for forensics.",
+      "source_files": ["src/services/payment_service.py", "src/services/order_service.py", "src/database/migrations.py", "docs/incidents/2024-05-payment-double-charge.md"]
+    },
+    {
+      "id": "mh-015",
+      "question": "How does the system handle notification rate limiting?",
+      "hops": 2,
+      "expected_concepts": ["notification_service", "redis_sliding_window", "email_rate_limit", "push_rate_limit", "webhook_rate_limit"],
+      "answer": "notification_service implements per-channel rate limits using Redis counters with 1-hour TTL: email (10/hr per user), push (30/hr per user), webhook (100/hr per endpoint). If rate limited, notifications are queued for later delivery. This prevents spam during rapid order status changes. The rate limiting uses the same Redis pool as everything else.",
+      "source_files": ["src/services/notification_service.py", "src/config/constants.py", "src/database/connection.py"]
+    },
+    {
+      "id": "mh-016",
+      "question": "What is the connection between the token_version field and the token leak incident?",
+      "hops": 3,
+      "expected_concepts": ["user_model", "token_version", "token_leak", "mass_invalidation", "auth_service"],
+      "answer": "The token_version field was added to the User model after the March 2024 token leak. It enables mass-invalidation of all tokens for a user by incrementing the version. All tokens with version < current are rejected. This is used by auth_service._terminate_all_sessions() when token reuse (theft) is detected. It provides a database-level kill switch independent of Redis session state.",
+      "source_files": ["src/models/user.py", "src/services/auth_service.py", "docs/incidents/2024-03-token-leak.md"]
+    },
+    {
+      "id": "mh-017",
+      "question": "What are the valid order state transitions and what side effects does each trigger?",
+      "hops": 3,
+      "expected_concepts": ["order_model", "state_machine", "order_service", "payment_capture", "inventory_release", "event_emission"],
+      "answer": "Valid transitions: pending→confirmed (triggers payment capture via payment_service), confirmed→shipped (admin only, emits event), shipped→delivered (admin only, emits event), pending→cancelled (releases inventory, emits event), confirmed→cancelled (releases inventory + triggers refund, emits event). All transitions emit events consumed by notification_service. Terminal states (delivered, cancelled) allow no further transitions.",
+      "source_files": ["src/models/order.py", "src/services/order_service.py", "src/services/payment_service.py", "src/services/inventory_service.py"]
+    },
+    {
+      "id": "mh-018",
+      "question": "How would you trace a bug where users aren't receiving order confirmation emails?",
+      "hops": 4,
+      "expected_concepts": ["order_service", "redis_pub_sub", "notification_service", "email_queue", "email_worker", "smtp"],
+      "answer": "Trace the chain: (1) Check order_service._emit_event() is publishing to 'order_events' Redis channel, (2) Check notification_service is subscribed and handle_order_event() is being called, (3) Check _check_rate_limit() isn't blocking (email limit: 10/hr), (4) Check email is being queued to 'email_queue' in Redis, (5) Check email_worker is running and consuming from queue, (6) Check SMTP connection (settings.py config), (7) Check email_dead_letter queue for permanently failed emails.",
+      "source_files": ["src/services/order_service.py", "src/services/notification_service.py", "src/workers/email_worker.py", "src/config/settings.py", "src/database/connection.py"]
+    },
+    {
+      "id": "mh-019",
+      "question": "What is the role of the idempotency_key field added to the Order model?",
+      "hops": 3,
+      "expected_concepts": ["order_model", "double_charge", "payment_service", "stripe_idempotency", "may_2024_incident"],
+      "answer": "The idempotency_key was added after the May 2024 double-charge incident. It's generated by order_service during order creation and passed to payment_service.authorize(). It serves three purposes: (1) Redis-level check in payment_service prevents duplicate Stripe calls, (2) Passed to Stripe as idempotency_key so Stripe returns same result for retries, (3) Stored in order record and payment_records table with UNIQUE constraint for audit trail.",
+      "source_files": ["src/models/order.py", "src/services/order_service.py", "src/services/payment_service.py", "docs/incidents/2024-05-payment-double-charge.md"]
+    },
+    {
+      "id": "mh-020",
+      "question": "What happens if inventory reservation expires before payment is captured?",
+      "hops": 3,
+      "expected_concepts": ["inventory_service", "reservation_ttl", "payment_capture", "order_service", "stock_sold_to_another"],
+      "answer": "If the 15-minute reservation TTL expires before order confirmation (payment capture), the reserved stock automatically becomes available again (Redis key expires). Another customer could then purchase it. When the original order tries to confirm, inventory_service.confirm_reservation() will fail with 'Reservation expired or not found'. This is an accepted trade-off documented in ADR-002 — the reservation TTL must be longer than typical payment authorization time.",
+      "source_files": ["src/services/inventory_service.py", "src/services/order_service.py", "src/config/constants.py", "docs/decisions/adr-002-event-driven.md"]
+    },
+    {
+      "id": "mh-021",
+      "question": "How does the RBAC system work and who can cancel orders?",
+      "hops": 2,
+      "expected_concepts": ["user_model", "role_permissions", "order_cancellation", "customer_vs_admin"],
+      "answer": "RBAC is defined in user.py with three roles: customer, admin, support. Customers have 'order:cancel_own' permission (can only cancel their own orders in pending/confirmed state). Admins have 'order:cancel_any' permission. The order route checks user permissions, and order_service.cancel_order() verifies order.user_id matches the requesting user (unless admin). State machine prevents cancellation of shipped/delivered orders regardless of role.",
+      "source_files": ["src/models/user.py", "src/api/routes/orders.py", "src/services/order_service.py", "src/models/order.py"]
+    }
+  ],
+  "hidden_relationships": [
+    {
+      "id": "hr-001",
+      "description": "Token leak incident was caused by deterministic IV in crypto.py affecting auth_service.py",
+      "source": "src/utils/crypto.py",
+      "target": "src/services/auth_service.py",
+      "relationship": "crypto bug → token vulnerability → auth compromise",
+      "evidence_files": ["src/utils/crypto.py", "src/services/auth_service.py", "docs/incidents/2024-03-token-leak.md"]
+    },
+    {
+      "id": "hr-002",
+      "description": "Payment double-charge caused by race condition between order_service and payment_service",
+      "source": "src/services/order_service.py",
+      "target": "src/services/payment_service.py",
+      "relationship": "concurrent requests → read-then-write race → double charge",
+      "evidence_files": ["src/services/order_service.py", "src/services/payment_service.py", "docs/incidents/2024-05-payment-double-charge.md"]
+    },
+    {
+      "id": "hr-003",
+      "description": "Rate limiter shares Redis with session store - both break if Redis goes down",
+      "source": "src/middleware/rate_limiter.py",
+      "target": "src/services/auth_service.py",
+      "relationship": "shared Redis pool → correlated failure",
+      "evidence_files": ["src/middleware/rate_limiter.py", "src/services/auth_service.py", "src/database/connection.py"]
+    },
+    {
+      "id": "hr-004",
+      "description": "Notification service depends on order state changes via events (no direct import)",
+      "source": "src/services/notification_service.py",
+      "target": "src/services/order_service.py",
+      "relationship": "event-driven coupling via Redis pub/sub",
+      "evidence_files": ["src/services/notification_service.py", "src/services/order_service.py", "docs/decisions/adr-002-event-driven.md"]
+    },
+    {
+      "id": "hr-005",
+      "description": "Inventory release on cancellation is managed by order_service, not inventory_service",
+      "source": "src/services/order_service.py",
+      "target": "src/services/inventory_service.py",
+      "relationship": "order_service orchestrates inventory release on cancel",
+      "evidence_files": ["src/services/order_service.py", "src/services/inventory_service.py"]
+    },
+    {
+      "id": "hr-006",
+      "description": "Webhook failure notification uses email_worker (cross-worker dependency)",
+      "source": "src/workers/webhook_worker.py",
+      "target": "src/workers/email_worker.py",
+      "relationship": "webhook permanent failure → queues email notification",
+      "evidence_files": ["src/workers/webhook_worker.py", "src/workers/email_worker.py"]
+    },
+    {
+      "id": "hr-007",
+      "description": "Token expiry reduction (1h→15min) was a direct response to the crypto.py bug",
+      "source": "src/config/constants.py",
+      "target": "docs/incidents/2024-03-token-leak.md",
+      "relationship": "incident response → configuration change",
+      "evidence_files": ["src/config/constants.py", "docs/incidents/2024-03-token-leak.md", "src/api/routes/auth.py"]
+    },
+    {
+      "id": "hr-008",
+      "description": "Migration v4 (payment audit) was added because of the double-charge incident",
+      "source": "src/database/migrations.py",
+      "target": "docs/incidents/2024-05-payment-double-charge.md",
+      "relationship": "incident → schema change for audit trail",
+      "evidence_files": ["src/database/migrations.py", "docs/incidents/2024-05-payment-double-charge.md"]
+    }
+  ],
+  "concept_clusters": [
+    {
+      "name": "Authentication & Security",
+      "concepts": ["jwt", "rs256", "bcrypt", "token_rotation", "session", "redis", "crypto", "deterministic_iv"],
+      "files": ["src/utils/crypto.py", "src/services/auth_service.py", "src/config/settings.py", "docs/decisions/adr-001-jwt-rs256.md"]
+    },
+    {
+      "name": "Order Lifecycle",
+      "concepts": ["state_machine", "pending", "confirmed", "shipped", "delivered", "cancelled", "inventory_reservation", "payment_capture"],
+      "files": ["src/models/order.py", "src/services/order_service.py", "src/api/routes/orders.py"]
+    },
+    {
+      "name": "Payment Processing",
+      "concepts": ["stripe", "idempotency", "authorization", "capture", "refund", "advisory_lock", "double_charge"],
+      "files": ["src/services/payment_service.py", "src/services/order_service.py", "docs/incidents/2024-05-payment-double-charge.md"]
+    },
+    {
+      "name": "Event-Driven Architecture",
+      "concepts": ["redis_pub_sub", "event_emission", "decoupling", "notification", "webhook", "email_queue"],
+      "files": ["src/services/notification_service.py", "src/services/order_service.py", "src/workers/email_worker.py", "src/workers/webhook_worker.py", "docs/decisions/adr-002-event-driven.md"]
+    },
+    {
+      "name": "Redis as Infrastructure",
+      "concepts": ["connection_pool", "sessions", "rate_limiting", "reservations", "pub_sub", "queues", "single_point_of_failure"],
+      "files": ["src/database/connection.py", "src/middleware/rate_limiter.py", "src/services/auth_service.py", "src/services/inventory_service.py"]
+    }
+  ]
+}

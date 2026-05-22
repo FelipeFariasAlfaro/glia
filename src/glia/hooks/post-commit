@@ -1,0 +1,23 @@
+#!/bin/sh
+# GLIA Git Hook - Learns from each commit automatically.
+# Install: cp this file to .git/hooks/post-commit && chmod +x .git/hooks/post-commit
+#
+# What it does:
+# - Captures the commit message (the WHY behind the change)
+# - Captures which files were modified
+# - Feeds this to GLIA as relational/historical knowledge
+#
+# This is FREE (no AI tokens) — it just records the commit context.
+
+COMMIT_MSG=$(git log -1 --pretty=%B)
+COMMIT_HASH=$(git rev-parse --short HEAD)
+CHANGED_FILES=$(git diff-tree --no-commit-id --name-only -r HEAD | head -10)
+AUTHOR=$(git log -1 --pretty=%an)
+
+# Build the knowledge string
+KNOWLEDGE="Commit ${COMMIT_HASH} by ${AUTHOR}: ${COMMIT_MSG}. Files changed: ${CHANGED_FILES}"
+
+# Teach GLIA (uses the CLI, no AI needed for storage)
+python -m glia learn "${KNOWLEDGE}" --source "git:${COMMIT_HASH}" 2>/dev/null
+
+exit 0
