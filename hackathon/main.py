@@ -1,7 +1,7 @@
 import os
 import requests
 import json
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, UploadFile, File
 from pydantic import BaseModel
 from typing import Optional, List
 from pathlib import Path
@@ -17,7 +17,7 @@ load_dotenv()
 app = FastAPI(
     title="GLIA Memory API",
     description="Cloud-Native Holographic Memory for AI Agents",
-    version="1.1.0"
+    version="1.2.0"
 )
 
 # Configuration
@@ -28,7 +28,7 @@ GLIA_MODEL = os.environ.get("GLIA_MODEL", "gemini-3.1-flash-lite-preview")
 
 # Initialize Clients
 ai = genai.Client(api_key=GEMINI_API_KEY)
-workspace = Path(__file__).parent
+workspace = Path(__file__).parent.parent # Point to project root
 brain = GliaBrain(workspace=workspace, model=GLIA_MODEL)
 
 if not brain.is_initialized:
@@ -66,6 +66,35 @@ async def learn(request: LearnRequest):
         return {
             "summary": result.get("summary"),
             "concepts": result.get("concepts")
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/sync-memory")
+async def sync_memory(file: UploadFile = File(...)):
+    """Replaces current server memory with a local .db file."""
+    try:
+        # Close existing storage connection to prevent locks
+        if brain._storage:
+            brain._storage.close()
+            brain._storage = None
+            
+        target_path = brain.glia_path / "memory.db"
+        brain.glia_path.mkdir(parents=True, exist_ok=True)
+        
+        # Save the uploaded file
+        with open(target_path, "wb") as buffer:
+            content = await file.read()
+            buffer.write(content)
+        
+        # Reset and reload the brain state
+        brain._loaded = False
+        brain.load() # This re-populates brain.substrate
+        
+        return {
+            "status": "success",
+            "message": "Memory database updated",
+            "stats": brain.stats()
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -132,6 +161,20 @@ async def run_autonomous_review(project_id: int, mr_iid: int):
     post_gitlab_comment(project_id, mr_iid, final_comment)
     print(f"✅ Review posted to GitLab for MR !{mr_iid}")
 
+async def learn_from_merged_mr(project_id: int, mr_iid: int):
+    """Learns from changes after a Merge Request has been merged."""
+    print(f"🧠 MR !{mr_iid} merged! Learning changes...")
+    diff = fetch_gitlab_mr_diff(project_id, mr_iid)
+    if diff and not diff.startswith("Error"):
+        try:
+            result = brain.learn(
+                content=f"Approved Changes in MR !{mr_iid}:\n\n{diff}",
+                source=f"gitlab-mr-{mr_iid}-merged"
+            )
+            print(f"✅ Knowledge integrated for MR !{mr_iid}: {result.get('concepts')}")
+        except Exception as e:
+            print(f"❌ Error learning from MR !{mr_iid}: {e}")
+
 @app.post("/webhook/gitlab")
 async def gitlab_webhook(request: Request, background_tasks: BackgroundTasks):
     """Receives Merge Request events from GitLab."""
@@ -142,15 +185,18 @@ async def gitlab_webhook(request: Request, background_tasks: BackgroundTasks):
     if object_kind == "merge_request":
         attr = data.get("object_attributes", {})
         action = attr.get("action")
+        project_id = data.get("project", {}).get("id")
+        mr_iid = attr.get("iid")
         
-        # Trigger review on open or update
+        # Case 1: Autonomous Review (Open/Update)
         if action in ["open", "reopen", "update"]:
-            project_id = data.get("project", {}).get("id")
-            mr_iid = attr.get("iid")
-            
-            # Run in background to avoid GitLab timeout
             background_tasks.add_task(run_autonomous_review, project_id, mr_iid)
             return {"status": "accepted", "message": "Review task scheduled"}
+
+        # Case 2: Autonomous Learning (Merge)
+        if action == "merge":
+            background_tasks.add_task(learn_from_merged_mr, project_id, mr_iid)
+            return {"status": "accepted", "message": "Learning task scheduled"}
             
     return {"status": "ignored"}
 
