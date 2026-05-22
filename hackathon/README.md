@@ -11,7 +11,8 @@ This project is a submission for the **Google Cloud Rapid Agent Hackathon**.
 AI agents often suggest code patterns that the team decided to abandon months ago. GLIA acts as an **Autonomous Digital Tech Lead** that:
 1. **Remembers** past incidents, design decisions, and team conventions.
 2. **Reasons** about new code by comparing it with that collective memory (via **Gemini 3.1 Flash Lite Preview**).
-3. **Acts Proactively** by automatically reviewing Merge Requests in GitLab before they are merged.
+3. **Acts Proactively** by automatically reviewing Merge Requests in GitLab.
+4. **Learns Continuously** by automatically integrating approved changes into its holographic substrate once an MR is merged.
 
 ---
 
@@ -21,13 +22,11 @@ To meet enterprise requirements and the hackathon's rules, this agent is hosted 
 
 1. **Reasoning Engine:** Powered by **Gemini 3.1 Flash Lite** orchestrated within a **FastAPI** autonomous agent.
 2. **The Memory Tool (Cloud Run):** The GLIA Holographic Memory engine is exposed as a microservice deployed on **Google Cloud Run**.
-3. **GitLab Webhook Integration:** The system acts as a pro-active auditor. GitLab sends real-time events (webhooks) to GLIA, triggering an autonomous review loop.
-4. **The Workflow:** 
+3. **GitLab Webhook Integration:** The system acts as a pro-active auditor and learner. GitLab sends real-time events (webhooks) for both MR reviews and MR merges.
+4. **The Closed-Loop Workflow:** 
    *   **Push/MR** occurs in GitLab.
-   *   **Webhook** triggers GLIA on Cloud Run.
-   *   **GLIA** fetches the code diff and "resonates" with its holographic memory.
-   *   **Gemini** generates a context-aware review.
-   *   **GitLab API** receives the final review comment automatically.
+   *   **Review Trigger:** GLIA fetches the code diff, consults its memory, and Gemini posts a context-aware review.
+   *   **Merge Trigger:** Once the MR is merged, GitLab sends a new webhook. GLIA automatically "learns" the approved code, closing the epistemic loop.
 
 ---
 
@@ -66,7 +65,14 @@ gcloud run deploy glia-memory-api \
 
 ## 📖 The "Golden Demo": How to Test It
 
-### Step 1: Inject Historical Knowledge (The "Teach" Phase)
+### Step 1: Sync your Local Memory (The Migration Phase)
+If you have already scanned your project locally using `glia scan`, you can migrate your entire knowledge base to the cloud with one command:
+
+```powershell
+Invoke-RestMethod -Uri "https://YOUR_CLOUD_RUN_URL/sync-memory" -Method Post -InFile ".glia/memory.db" -ContentType "application/octet-stream"
+```
+
+### Step 2: Inject Historical Knowledge
 Use PowerShell or curl to "teach" a critical rule directly to your production API:
 
 ```powershell
@@ -78,11 +84,14 @@ $body = @{
 Invoke-RestMethod -Uri "https://YOUR_CLOUD_RUN_URL/learn" -Method Post -Body $body -ContentType "application/json"
 ```
 
-### Step 2: Trigger the Autonomous Review
-1. Create a new branch in your repository.
-2. Add a code snippet that violates the rule (e.g., adding `JSON.stringify` to a log in a payment-related file).
-3. Open a **Merge Request** in GitLab.
-4. **Watch the Magic:** In seconds, a comment from **"🤖 GLIA Tech Lead Review"** will appear in the MR, identifying the specific historical incident and rejecting the change.
+### Step 3: Trigger the Autonomous Review
+1. Create a new branch and add a code snippet that violates the rule (e.g., using `JSON.stringify` in a payment log).
+2. Open a **Merge Request**. GLIA will comment with a rejection based on the historical incident.
+
+### Step 4: Close the Loop (Learning)
+1. Fix the code to follow the rule.
+2. **Merge the MR**.
+3. GLIA will receive the "merge" event and automatically learn the new, correct implementation. Future recalls on "payment logging" will now resonate with both the old incident AND the new approved pattern.
 
 ---
 
