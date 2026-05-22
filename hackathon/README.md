@@ -8,10 +8,10 @@ This project is a submission for the **Google Cloud Rapid Agent Hackathon**.
 
 ## 🚀 The Vision: An Agent that "Remembers"
 
-AI agents often suggest code patterns that the team decided to abandon months ago. GLIA acts as a **Digital Tech Lead** that:
+AI agents often suggest code patterns that the team decided to abandon months ago. GLIA acts as an **Autonomous Digital Tech Lead** that:
 1. **Remembers** past incidents, design decisions, and team conventions.
 2. **Reasons** about new code by comparing it with that collective memory (via **Gemini 3.1 Flash Lite Preview**).
-3. **Integrates natively** into the Google Cloud ecosystem.
+3. **Acts Proactively** by automatically reviewing Merge Requests in GitLab before they are merged.
 
 ---
 
@@ -19,10 +19,15 @@ AI agents often suggest code patterns that the team decided to abandon months ag
 
 To meet enterprise requirements and the hackathon's rules, this agent is hosted natively on **Google Cloud**:
 
-1. **Reasoning Engine:** Powered by **Vertex AI Agent Builder** acting as the conversational brain.
-2. **The Memory Tool (Cloud Run):** The GLIA Holographic Memory engine is exposed as a **FastAPI** microservice deployed on **Google Cloud Run**.
-3. **OpenAPI Integration:** Vertex AI connects to GLIA via an OpenAPI specification (`openapi.yaml`), using Google's secure **Service Agent Token** authentication. 
-4. **The Workflow:** When the user asks the agent to review code, Vertex AI dynamically routes the request to the Cloud Run memory tool, retrieves the structural context via parallel resonance, and formulates a historically-aware response.
+1. **Reasoning Engine:** Powered by **Gemini 3.1 Flash Lite** orchestrated within a **FastAPI** autonomous agent.
+2. **The Memory Tool (Cloud Run):** The GLIA Holographic Memory engine is exposed as a microservice deployed on **Google Cloud Run**.
+3. **GitLab Webhook Integration:** The system acts as a pro-active auditor. GitLab sends real-time events (webhooks) to GLIA, triggering an autonomous review loop.
+4. **The Workflow:** 
+   *   **Push/MR** occurs in GitLab.
+   *   **Webhook** triggers GLIA on Cloud Run.
+   *   **GLIA** fetches the code diff and "resonates" with its holographic memory.
+   *   **Gemini** generates a context-aware review.
+   *   **GitLab API** receives the final review comment automatically.
 
 ---
 
@@ -31,42 +36,38 @@ To meet enterprise requirements and the hackathon's rules, this agent is hosted 
 - **Google Cloud SDK (`gcloud` CLI)**
 - A Google Cloud Project with Billing Enabled.
 - **Gemini API Key** (obtained at [Google AI Studio](https://aistudio.google.com/apikey))
+- **GitLab Personal Access Token** (with `api` scope to post comments).
 
 ---
 
 ## 🛠️ Step-by-Step Deployment
 
-### 1. Deploy the Memory Engine to Cloud Run
-From the root of the repository, deploy the FastAPI wrapper to Google Cloud:
+### 1. Deploy the Autonomous Agent to Cloud Run
+From the root of the repository, deploy the project to Google Cloud:
 
 ```bash
 gcloud run deploy glia-memory-api \
   --source . \
   --region us-central1 \
   --allow-unauthenticated \
-  --set-env-vars="GEMINI_API_KEY=your_key_here,GLIA_MODEL=gemini-3.1-flash-lite-preview"
+  --set-env-vars="GEMINI_API_KEY=your_gemini_key,GITLAB_PERSONAL_ACCESS_TOKEN=your_gitlab_token,GLIA_MODEL=gemini-3.1-flash-lite-preview"
 ```
-*Take note of the provided Service URL.*
+*Take note of the provided **Service URL** (e.g., `https://glia-memory-api-xxx.a.run.app`).*
 
-### 2. Configure Vertex AI Agent Builder
-1. Go to **Vertex AI Agent Builder** in the Google Cloud Console and create a new **Conversational Agent**.
-2. Go to the **Tools** menu and create a new **OpenAPI Tool** named `GliaMemory`.
-3. Paste the contents of `hackathon/openapi.yaml` (make sure to replace the `url` field with your live Cloud Run URL).
-4. Select **Service Agent Token** for authentication.
-
-### 3. Set the Playbook Instructions
-In your Agent's Default Playbook, add `GliaMemory` to the active tools and paste this instruction:
-
-> "You are a Senior Tech Lead responsible for code reviews. Whenever you are presented with a code snippet or technical question, you must first consult the project's historical memory to check for past incidents or architectural rules. 
-> To do this, **use the GliaMemory tool** (specifically the `recall_memory` action). Pass the code diff or the core technical concept as the `query`.
-> After receiving the context, evaluate the current code change. If the history reveals any specific rules, reject the change and explain the risk. If no conflicts are found, approve it."
+### 2. Configure the GitLab Webhook
+1. Go to your repository on **GitLab.com**.
+2. Navigate to **Settings** -> **Webhooks**.
+3. Click **Add new webhook**.
+4. **URL:** Enter your Cloud Run URL followed by `/webhook/gitlab` (e.g., `https://glia-api-xxx.a.run.app/webhook/gitlab`).
+5. **Trigger:** Check the **"Merge request events"** box.
+6. Click **Save changes**.
 
 ---
 
 ## 📖 The "Golden Demo": How to Test It
 
-### Step 1: Inject Historical Knowledge
-Use PowerShell or curl to "teach" a rule directly to your production API:
+### Step 1: Inject Historical Knowledge (The "Teach" Phase)
+Use PowerShell or curl to "teach" a critical rule directly to your production API:
 
 ```powershell
 $body = @{
@@ -77,16 +78,11 @@ $body = @{
 Invoke-RestMethod -Uri "https://YOUR_CLOUD_RUN_URL/learn" -Method Post -Body $body -ContentType "application/json"
 ```
 
-### Step 2: Test the Agent in the Simulator
-Open the **Simulator** pane in Vertex AI Agent Builder and paste the "dangerous" code:
-
-> *"Please review this code: logger.info('Payload: ' + JSON.stringify(paymentPayload));"*
-
-### What will happen?
-1. The Gemini Agent will intercept the request and recognize it needs context.
-2. It will trigger a **Tool Call** to your Cloud Run deployment via the OpenAPI spec.
-3. GLIA will retrieve "Incident #402" through **pattern resonance**.
-4. The Agent will synthesize the memory and aggressively reject the code, explaining the risk of CPU spikes based on the team's history.
+### Step 2: Trigger the Autonomous Review
+1. Create a new branch in your repository.
+2. Add a code snippet that violates the rule (e.g., adding `JSON.stringify` to a log in a payment-related file).
+3. Open a **Merge Request** in GitLab.
+4. **Watch the Magic:** In seconds, a comment from **"🤖 GLIA Tech Lead Review"** will appear in the MR, identifying the specific historical incident and rejecting the change.
 
 ---
 
@@ -94,13 +90,14 @@ Open the **Simulator** pane in Vertex AI Agent Builder and paste the "dangerous"
 GLIA is not just an idea; it has been rigorously tested:
 - **2.5x better retrieval** than traditional knowledge graphs.
 - **97.8% token savings** by sending only the resonant context to the LLM.
-- **Latency < 100ms** for local/container lookups.
+- **Latency < 100ms** for holographic lookups.
 
 ---
 
 ## 👨‍💻 Author
 **Felipe Farías Alfaro**
 Project developed for the Google Cloud Rapid Agent Hackathon (May 2026).
+
 
 
 # 🧠 GLIA - Holographic Distributed Memory for AI Agents
