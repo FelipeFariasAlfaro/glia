@@ -1,3 +1,5 @@
+🚀 HACKATHON SUBMISSION: If you are a judge for the Google Cloud Rapid Agent Hackathon, please go directly to the  hackathon/ folder (./hackathon/) for the full architecture, deployment guide, and automated demo instructions.
+
 # 🧠 GLIA - Holographic Distributed Memory for AI Agents
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
