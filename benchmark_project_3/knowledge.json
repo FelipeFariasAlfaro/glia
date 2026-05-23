@@ -1,0 +1,174 @@
+{
+  "project": "benchmark_project_3",
+  "description": "TypeScript/React SPA with Redux state management, WebSocket real-time updates, and complex auth flows",
+  "questions": [
+    {
+      "id": 1,
+      "question": "What was the root cause of the 2024-04 infinite refresh loop, and which specific flag in which file was added to fix it?",
+      "answer": "The apiMiddleware intercepted 401 responses and called refreshTokenApi, but if the refresh token was also expired, the refresh endpoint returned 401 again, causing an infinite loop. The fix was adding the `isRefreshing` flag in `authSlice.ts` which the middleware checks before attempting a refresh.",
+      "reasoning": "Requires connecting the incident post-mortem (docs/incidents/2024-04-infinite-refresh.md) with the implementation in authSlice.ts and apiMiddleware.ts to understand the full cause-and-fix chain.",
+      "files_needed": ["src/store/authSlice.ts", "src/store/middleware/apiMiddleware.ts", "docs/incidents/2024-04-infinite-refresh.md"],
+      "hops": 3
+    },
+    {
+      "id": 2,
+      "question": "If a developer changes the permission format from 'resource:action' to 'resource.action.subaction', which components would break and why?",
+      "answer": "Both ProtectedRoute.tsx and OrderActions.tsx would break because they independently check permissions using `permissions.includes('orders:cancel')` style checks. They both read from authSlice.user.permissions but perform their own string matching. The permissions.ts utility functions (hasPermission, isValidPermission) would also need updating.",
+      "reasoning": "Requires understanding that permissions are checked independently in two places (ProtectedRoute and OrderActions) plus the utility file, all reading from the same authSlice source.",
+      "files_needed": ["src/components/auth/ProtectedRoute.tsx", "src/components/orders/OrderActions.tsx", "src/utils/permissions.ts", "src/store/authSlice.ts"],
+      "hops": 4
+    },
+    {
+      "id": 3,
+      "question": "Why does MetricsWidget show stale data without any visual indicator when the WebSocket disconnects, and what incident documented this issue?",
+      "answer": "MetricsWidget uses useWebSocket which sets `isConnected` to false on disconnect, but the MetricsWidget component does not render any visual staleness indicator when isConnected is false — it just continues showing the last received data. This was documented in the 2024-07 stale cache incident (docs/incidents/2024-07-stale-cache.md).",
+      "reasoning": "Requires tracing from MetricsWidget → useWebSocket hook (isConnected state) → noting the absence of staleness UI → connecting to the incident documentation.",
+      "files_needed": ["src/components/dashboard/MetricsWidget.tsx", "src/hooks/useWebSocket.ts", "docs/incidents/2024-07-stale-cache.md"],
+      "hops": 3
+    },
+    {
+      "id": 4,
+      "question": "What happens if the 'advanced-order-filters' feature flag is enabled but the v2 API is not deployed? Trace the full impact path.",
+      "answer": "Enabling the flag causes: (1) routes.ts adds the /orders/advanced route, (2) ordersSlice.ts fetchOrders thunk switches to /v2/orders endpoint, (3) orders.ts API calls use the v2 path, (4) OrderList.tsx shows advanced filter UI. Since v2 API isn't deployed, all order fetches return 404 errors — the route works but data loading fails.",
+      "reasoning": "Requires tracing the feature flag through featureFlags.ts → routes.ts (route availability) → ordersSlice.ts (API version) → orders.ts (endpoint path) → understanding the 404 consequence.",
+      "files_needed": ["src/config/featureFlags.ts", "src/config/routes.ts", "src/store/ordersSlice.ts", "src/api/orders.ts", "src/components/orders/OrderList.tsx"],
+      "hops": 5
+    },
+    {
+      "id": 5,
+      "question": "If the ordersSlice 'items' array is renamed to 'orders', what would silently break and why?",
+      "answer": "The useOptimisticUpdate hook's rollback mechanism would silently fail. It dispatches actions like `updateOrderStatus` which targets `state.items.find(...)` in the reducer. If 'items' is renamed to 'orders' but the reducer logic isn't updated, the rollback dispatch would be a no-op — the UI stays in the optimistic state even after API failure, with no error surfaced.",
+      "reasoning": "Requires understanding the coupling between useOptimisticUpdate (dispatches rollback actions) → ordersSlice (reducer assumes 'items' array) → OrderActions (triggers optimistic updates).",
+      "files_needed": ["src/hooks/useOptimisticUpdate.ts", "src/store/ordersSlice.ts", "src/components/orders/OrderActions.tsx"],
+      "hops": 3
+    },
+    {
+      "id": 6,
+      "question": "Explain the token storage priority issue: what happens when a user logs in with 'remember me' and then logs in again without it in a new tab?",
+      "answer": "First login stores tokens in localStorage (remember me = true). Second login stores tokens in sessionStorage (remember me = false). Now both storages have tokens. getToken() checks localStorage FIRST, so the older (possibly expired) localStorage token is used by both apiMiddleware and the Axios client, even though sessionStorage has a fresher token.",
+      "reasoning": "Requires understanding tokenStorage.ts priority logic → how LoginForm sets storage type → how apiMiddleware and client.ts both call getToken() → the consequence of localStorage priority.",
+      "files_needed": ["src/utils/tokenStorage.ts", "src/components/auth/LoginForm.tsx", "src/store/middleware/apiMiddleware.ts", "src/api/client.ts"],
+      "hops": 4
+    },
+    {
+      "id": 7,
+      "question": "Why don't WebSocket errors from useWebSocket get caught by the ErrorBoundary component?",
+      "answer": "React ErrorBoundary only catches errors during rendering, lifecycle methods, and constructors. WebSocket errors are asynchronous/event-driven (they occur in ws.onerror and ws.onclose callbacks). These async errors bypass ErrorBoundary entirely. The ErrorBoundary component's JSDoc explicitly documents this limitation.",
+      "reasoning": "Requires understanding React ErrorBoundary limitations (only catches render errors) → useWebSocket error handling (async callbacks) → the documented gap in ErrorBoundary.tsx.",
+      "files_needed": ["src/components/shared/ErrorBoundary.tsx", "src/hooks/useWebSocket.ts"],
+      "hops": 2
+    },
+    {
+      "id": 8,
+      "question": "There are two separate token refresh mechanisms in the codebase. Where are they, why do both exist, and how was the infinite loop only in one of them?",
+      "answer": "The two mechanisms are: (1) apiMiddleware.ts — handles 401 for Redux-dispatched API calls, and (2) client.ts Axios response interceptor — handles 401 for direct API calls from hooks. The Axios client already had its own `isRefreshing` variable preventing loops, but apiMiddleware didn't have this protection until the 2024-04 incident. The fix added the `isRefreshing` flag in authSlice for the middleware.",
+      "reasoning": "Requires finding both refresh mechanisms, understanding why both exist (Redux vs direct calls), and connecting to the incident to understand which one had the bug.",
+      "files_needed": ["src/store/middleware/apiMiddleware.ts", "src/api/client.ts", "src/store/authSlice.ts", "docs/incidents/2024-04-infinite-refresh.md"],
+      "hops": 4
+    },
+    {
+      "id": 9,
+      "question": "What is the full chain of events when a user clicks 'Cancel Order' in OrderActions, and what could go wrong?",
+      "answer": "Chain: (1) OrderActions checks permissions from authSlice, (2) calls useOptimisticUpdate.execute(), (3) optimistic dispatch updates ordersSlice status to 'cancelled' immediately, (4) cancelOrder API call fires in background, (5) on success: notification dispatched, (6) on failure: rollback dispatch reverts status, notification shows error. What could go wrong: if ordersSlice shape changed, rollback silently fails; if permissions changed format, button might not show at all.",
+      "reasoning": "Requires tracing OrderActions → permission check → useOptimisticUpdate → ordersSlice dispatch → API call → success/failure paths → potential failure modes.",
+      "files_needed": ["src/components/orders/OrderActions.tsx", "src/hooks/useOptimisticUpdate.ts", "src/store/ordersSlice.ts", "src/api/orders.ts", "src/store/notificationsSlice.ts"],
+      "hops": 5
+    },
+    {
+      "id": 10,
+      "question": "Why was Redux chosen over React Context, and what specific technical requirements drove that decision?",
+      "answer": "Redux was chosen because: (1) middleware support was needed for apiMiddleware (auth headers, 401 interception, retry logic, request queuing during refresh), (2) DevTools were critical for debugging the infinite refresh incident, (3) optimistic updates with rollback needed predictable reducers, (4) performance — Context re-renders all consumers on any change, but Redux's useSelector prevents unnecessary re-renders with frequent WebSocket updates.",
+      "reasoning": "Requires reading the ADR document and connecting the stated reasons to actual implementation patterns (apiMiddleware, useOptimisticUpdate, WebSocket updates).",
+      "files_needed": ["docs/decisions/adr-001-redux-over-context.md", "src/store/middleware/apiMiddleware.ts", "src/hooks/useOptimisticUpdate.ts"],
+      "hops": 3
+    },
+    {
+      "id": 11,
+      "question": "If useWebSocket's onclose handler were modified to dispatch clearOrdersCache(), which files would be affected and what problem would it solve?",
+      "answer": "Modifying useWebSocket to dispatch clearOrdersCache() on disconnect would: (1) require importing the action from ordersSlice.ts, (2) require access to dispatch (already available via useAppSelector pattern), (3) solve the stale cache issue documented in 2024-07 incident where users see outdated order data after disconnect. It would affect OrderList.tsx (would show empty/loading state instead of stale data) and Dashboard.tsx (recentOrders would clear).",
+      "reasoning": "Requires understanding the stale cache problem → the existing clearOrdersCache action → how OrderList and Dashboard consume ordersSlice data → the incident documentation.",
+      "files_needed": ["src/hooks/useWebSocket.ts", "src/store/ordersSlice.ts", "src/components/orders/OrderList.tsx", "src/components/dashboard/Dashboard.tsx", "docs/incidents/2024-07-stale-cache.md"],
+      "hops": 5
+    },
+    {
+      "id": 12,
+      "question": "What is the relationship between the 'rememberMe' checkbox in LoginForm and the token storage behavior that apiMiddleware relies on?",
+      "answer": "LoginForm's rememberMe checkbox determines whether tokens are stored in localStorage (checked) or sessionStorage (unchecked). This is passed to useAuth.login() which calls setToken() with the appropriate storage type. apiMiddleware then calls getToken() which checks localStorage first, then sessionStorage. So the rememberMe choice affects WHERE tokens are stored, and the middleware's priority logic determines WHICH token is used when both exist.",
+      "reasoning": "Requires tracing LoginForm (rememberMe state) → useAuth hook (storage type selection) → tokenStorage.ts (setToken/getToken) → apiMiddleware (getToken usage with priority).",
+      "files_needed": ["src/components/auth/LoginForm.tsx", "src/hooks/useAuth.ts", "src/utils/tokenStorage.ts", "src/store/middleware/apiMiddleware.ts"],
+      "hops": 4
+    },
+    {
+      "id": 13,
+      "question": "Which errors in this application are reported to Sentry and which are silently lost?",
+      "answer": "Reported to Sentry: (1) render errors caught by ErrorBoundary via reportError(), (2) 5xx API errors from Axios client interceptor. Silently lost or console-only: (1) WebSocket errors from useWebSocket (logged to console, not reported), (2) optimistic rollback failures (dispatch is a no-op if slice shape changed — no error thrown), (3) async errors from hooks that bypass ErrorBoundary.",
+      "reasoning": "Requires checking ErrorBoundary (calls reportError), client.ts (reports 5xx), useWebSocket (console.error only), useOptimisticUpdate (silent dispatch), and errorReporting.ts (documents the gaps).",
+      "files_needed": ["src/utils/errorReporting.ts", "src/components/shared/ErrorBoundary.tsx", "src/api/client.ts", "src/hooks/useWebSocket.ts", "src/hooks/useOptimisticUpdate.ts"],
+      "hops": 5
+    },
+    {
+      "id": 14,
+      "question": "How does the Dashboard component decide which widgets to show, and what are the failure modes for each decision?",
+      "answer": "Dashboard checks: (1) isFeatureEnabled('realtime-metrics') for MetricsWidget — if enabled without WebSocket server, widget shows zeros/stale data silently; (2) permissions.includes('analytics:view') for analytics section — if permission model changes, section disappears; (3) recentOrders from ordersSlice — if WebSocket disconnects, shows stale cached data. Each widget is wrapped in ErrorBoundary but async errors (WebSocket) bypass it.",
+      "reasoning": "Requires reading Dashboard.tsx → featureFlags check → permission check from authSlice → ordersSlice data → ErrorBoundary limitations → MetricsWidget WebSocket dependency.",
+      "files_needed": ["src/components/dashboard/Dashboard.tsx", "src/config/featureFlags.ts", "src/store/authSlice.ts", "src/components/dashboard/MetricsWidget.tsx", "src/components/shared/ErrorBoundary.tsx"],
+      "hops": 5
+    },
+    {
+      "id": 15,
+      "question": "What would happen if the backend reduced the refresh token TTL from 7 days to 1 hour, based on the 2024-04 incident?",
+      "answer": "Based on the 2024-04 incident, reducing refresh token TTL previously caused the infinite loop because expired refresh tokens returned 401 which triggered another refresh attempt. After the fix (isRefreshing flag), the system now handles this correctly: when refresh fails, it checks isRefreshing flag, clears auth state, and redirects to login. However, users would be logged out more frequently (every hour of inactivity), which is a UX impact.",
+      "reasoning": "Requires understanding the incident (TTL reduction triggered the bug) → the fix (isRefreshing flag) → current behavior with the fix in place → UX implications.",
+      "files_needed": ["docs/incidents/2024-04-infinite-refresh.md", "src/store/authSlice.ts", "src/store/middleware/apiMiddleware.ts", "src/hooks/useAuth.ts"],
+      "hops": 4
+    },
+    {
+      "id": 16,
+      "question": "Trace the data flow from a WebSocket message arriving to it being displayed in MetricsWidget, including all intermediate state.",
+      "answer": "Flow: (1) WebSocket receives message in useWebSocket's ws.onmessage callback, (2) message is JSON.parsed into MetricData type, (3) setState updates the hook's local state (data, lastMessageAt), (4) MetricsWidget re-renders because it destructures { data, isConnected, lastMessageAt } from the hook, (5) metrics values are formatted (currency via Intl.NumberFormat, percentage for conversion rate), (6) rendered in metric-card divs. No Redux involved — this is local hook state only.",
+      "reasoning": "Requires tracing useWebSocket (onmessage → setState) → MetricsWidget (destructures hook return) → render logic (formatting and display).",
+      "files_needed": ["src/hooks/useWebSocket.ts", "src/components/dashboard/MetricsWidget.tsx"],
+      "hops": 2
+    },
+    {
+      "id": 17,
+      "question": "What are all the places where the 'advanced-order-filters' feature flag is checked, and what does each check control?",
+      "answer": "The flag is checked in: (1) routes.ts — controls whether /orders/advanced route is registered; (2) ordersSlice.ts fetchOrders thunk — controls whether API calls go to /v1/orders or /v2/orders; (3) orders.ts fetchOrdersApi — also checks flag for API version selection; (4) OrderList.tsx — controls whether advanced filter UI (date range inputs) is rendered. The flag's definition in featureFlags.ts lists all affected files in its 'affects' array.",
+      "reasoning": "Requires searching all usages of isFeatureEnabled('advanced-order-filters') across the codebase and understanding what each check controls.",
+      "files_needed": ["src/config/featureFlags.ts", "src/config/routes.ts", "src/store/ordersSlice.ts", "src/api/orders.ts", "src/components/orders/OrderList.tsx"],
+      "hops": 5
+    },
+    {
+      "id": 18,
+      "question": "How does the ProtectedRoute component interact with the route configuration in routes.ts, and what's the relationship to OrderActions permission checks?",
+      "answer": "routes.ts defines routes with `requiredPermission` fields. ProtectedRoute wraps route components and checks if the user's permissions (from authSlice) include the required permission. OrderActions ALSO reads from authSlice.permissions but checks action-specific permissions (orders:cancel, orders:refund) independently. Both use the same flat string format and same data source, but if one is updated without the other, access control becomes inconsistent.",
+      "reasoning": "Requires connecting routes.ts (permission config) → ProtectedRoute (route-level check) → authSlice (permission source) → OrderActions (independent action-level check) → understanding the consistency risk.",
+      "files_needed": ["src/config/routes.ts", "src/components/auth/ProtectedRoute.tsx", "src/store/authSlice.ts", "src/components/orders/OrderActions.tsx", "src/utils/permissions.ts"],
+      "hops": 5
+    },
+    {
+      "id": 19,
+      "question": "What is the complete error handling strategy for a failed order cancellation, from API error to user notification?",
+      "answer": "Flow: (1) OrderActions calls useOptimisticUpdate.execute() with cancel config, (2) optimistic update dispatches status='cancelled' to ordersSlice immediately, (3) cancelOrder API call fails, (4) useOptimisticUpdate catches error and dispatches rollback (status back to original), (5) error is re-thrown to OrderActions catch block, (6) OrderActions dispatches addNotification with type='error' to notificationsSlice, (7) toast notification appears to user. If rollback fails silently (slice shape changed), user sees 'cancelled' status + error toast — contradictory UI.",
+      "reasoning": "Requires tracing the full error path: OrderActions → useOptimisticUpdate → ordersSlice rollback → notificationsSlice → potential inconsistency.",
+      "files_needed": ["src/components/orders/OrderActions.tsx", "src/hooks/useOptimisticUpdate.ts", "src/store/ordersSlice.ts", "src/store/notificationsSlice.ts", "src/api/orders.ts"],
+      "hops": 5
+    },
+    {
+      "id": 20,
+      "question": "Why does the Axios client in client.ts have its own isRefreshing flag separate from authSlice.isRefreshing, and what's the historical reason?",
+      "answer": "The Axios client (client.ts) had its own module-level `isRefreshing` boolean from the beginning to prevent its interceptor from looping. The authSlice.isRefreshing was added LATER during the 2024-04 incident fix because the apiMiddleware (which is separate from the Axios interceptor) didn't have loop protection. They're separate because: client.ts handles direct API calls from hooks, while apiMiddleware handles Redux-dispatched calls. The client's protection worked fine; the middleware's was missing.",
+      "reasoning": "Requires understanding the two refresh paths, reading the incident post-mortem for timeline, and understanding why both exist (different call patterns).",
+      "files_needed": ["src/api/client.ts", "src/store/middleware/apiMiddleware.ts", "src/store/authSlice.ts", "docs/incidents/2024-04-infinite-refresh.md"],
+      "hops": 4
+    },
+    {
+      "id": 21,
+      "question": "If the WebSocket server goes down permanently, what is the complete user experience degradation across all affected components?",
+      "answer": "Degradation: (1) MetricsWidget shows last received data with no staleness indicator — managers see outdated metrics; (2) ordersSlice cache is never cleared — OrderList shows stale order statuses; (3) Dashboard recentOrders remain cached — new orders don't appear; (4) useWebSocket attempts reconnection up to 5 times then stops — isConnected stays false; (5) ErrorBoundary does NOT catch the WebSocket errors — no error UI shown; (6) errorReporting is NOT called — Sentry has no visibility; (7) notification badge count stops updating. The app appears functional but all real-time data is frozen at last-known state.",
+      "reasoning": "Requires tracing WebSocket dependency through all consumers: MetricsWidget, ordersSlice cache behavior, Dashboard, ErrorBoundary limitations, error reporting gaps, and notification system.",
+      "files_needed": ["src/hooks/useWebSocket.ts", "src/components/dashboard/MetricsWidget.tsx", "src/store/ordersSlice.ts", "src/components/orders/OrderList.tsx", "src/components/dashboard/Dashboard.tsx", "src/components/shared/ErrorBoundary.tsx", "src/utils/errorReporting.ts"],
+      "hops": 7
+    }
+  ]
+}

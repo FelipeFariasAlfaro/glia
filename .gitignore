@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Environment
+.env
+glia.env
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# GLIA local memory (each user has their own)
+.glia/
+
+# IDE
+.vscode/
+.idea/
+.kiro/
+
+# Demo artifacts
+demo_workspace/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Personal notes
+idea.md
+
+# Legacy files
+examples/demo.py
+examples/token_benchmark.py
+src/glia/graph.py
+src/glia/threads.py
+src/glia/ast_scanner.py

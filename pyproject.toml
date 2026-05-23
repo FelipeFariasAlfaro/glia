@@ -1,0 +1,39 @@
+[project]
+name = "glia"
+version = "0.1.0-alpha"
+description = "Associative memory system with spreading activation for AI agents"
+readme = "README.md"
+requires-python = ">=3.11"
+license = {text = "MIT"}
+authors = [
+    {name = "Felipe Farías Alfaro"}
+]
+keywords = ["memory", "ai", "agents", "spreading-activation", "knowledge-graph", "mcp"]
+dependencies = [
+    "click>=8.1",
+    "numpy>=1.24",
+    "google-genai>=1.0",
+    "python-dotenv>=1.0",
+    "mcp>=1.0",
+    "watchdog>=3.0.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.30"]
+all = ["openai>=1.0", "anthropic>=0.30"]
+
+[project.urls]
+Homepage = "https://github.com/FelipeFariasAlfaro/glia"
+Repository = "https://github.com/FelipeFariasAlfaro/glia"
+Issues = "https://github.com/FelipeFariasAlfaro/glia/issues"
+
+[project.scripts]
+glia = "glia.cli:main"
+
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
