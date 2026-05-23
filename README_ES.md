@@ -592,12 +592,14 @@ glia/
 │   ├── mcp_server.py        # Servidor MCP
 │   └── cli.py               # Interfaz de línea de comandos
 ├── docs/
-│   ├── ARCHITECTURE.md      # Arquitectura detallada con diagramas
-│   └── benchmarks/          # Resultados de benchmarks
-├── benchmarks/              # Scripts de benchmark reproducibles
-├── examples/
-│   └── demo_v2.py           # Demo de capacidades holográficas
-└── benchmark_project*/      # Proyectos de prueba para benchmarks
+│   └── ARCHITECTURE.md      # Arquitectura detallada con diagramas
+├── benchmarks/
+│   ├── projects/            # Proyectos de prueba (ecommerce, ml_pipeline, frontend)
+│   ├── results/             # Reportes de resultados
+│   ├── benchmark_vs_graph.py
+│   ├── benchmark_vs_rag.py
+│   └── run_benchmark_v2.py  # Script principal de benchmark
+└── tests/                   # Tests unitarios
 ```
 
 ---
@@ -654,7 +656,7 @@ GLIA fue evaluado contra Graph (Spreading Activation) y BM25 (Elasticsearch) en 
 3. **Cálculo Real de Tokens:** Medido con `tiktoken` (cl100k_base), no aproximaciones de caracteres.
 4. **Reproducibilidad:** Todos los scripts de evaluación y repositorios de prueba están incluidos para verificación pública.
 
-📊 [Ver benchmarks completos](docs/benchmarks/BENCHMARK_SUMMARY.md)
+📊 [Ver benchmarks completos](benchmarks/results/BENCHMARK_SUMMARY.md)
 
 ---
 

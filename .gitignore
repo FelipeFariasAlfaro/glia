@@ -6,7 +6,7 @@ dist/
 build/
 .eggs/
 
-# Environment
+# Environment / Configuration
 .env
 glia.env
 
@@ -15,7 +15,7 @@ glia.env
 venv/
 env/
 
-# GLIA local memory (each user has their own)
+# GLIA local memory (each project generates its own)
 .glia/
 
 # IDE
@@ -23,19 +23,9 @@ env/
 .idea/
 .kiro/
 
-# Demo artifacts
-demo_workspace/
-
 # OS
 .DS_Store
 Thumbs.db
 
-# Personal notes
-idea.md
-
-# Legacy files
-examples/demo.py
-examples/token_benchmark.py
-src/glia/graph.py
-src/glia/threads.py
-src/glia/ast_scanner.py
+# Benchmark generated memories
+benchmarks/projects/*/.glia/

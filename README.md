@@ -591,12 +591,14 @@ glia/
 │   ├── mcp_server.py        # MCP Server
 │   └── cli.py               # Command line interface
 ├── docs/
-│   ├── ARCHITECTURE.md      # Detailed architecture with diagrams
-│   └── benchmarks/          # Benchmark results
-├── benchmarks/              # Reproducible benchmark scripts
-├── examples/
-│   └── demo_v2.py           # Holographic capabilities demo
-└── benchmark_project*/      # Test projects for benchmarks
+│   └── ARCHITECTURE.md      # Detailed architecture with diagrams
+├── benchmarks/
+│   ├── projects/            # Test projects (ecommerce, ml_pipeline, frontend)
+│   ├── results/             # Benchmark result reports
+│   ├── benchmark_vs_graph.py
+│   ├── benchmark_vs_rag.py
+│   └── run_benchmark_v2.py  # Main benchmark script
+└── tests/                   # Unit tests
 ```
 
 ---
@@ -653,7 +655,7 @@ GLIA was evaluated against Graph (Spreading Activation) and BM25 (Elasticsearch)
 3. **Real Token Calculation:** Measured using `tiktoken` (cl100k_base), not character approximations.
 4. **Reproducibility:** All evaluation scripts and test repositories are included for public verification.
 
-📊 [View full benchmarks](docs/benchmarks/BENCHMARK_SUMMARY.md)
+📊 [View full benchmarks](benchmarks/results/BENCHMARK_SUMMARY.md)
 
 ---
 
