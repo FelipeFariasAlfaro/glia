@@ -1,14 +1,25 @@
 [project]
-name = "glia"
-version = "0.1.0-alpha"
-description = "Associative memory system with spreading activation for AI agents"
+name = "glia-memory"
+version = "0.1.0"
+description = "Holographic Distributed Memory for AI agents. Persistent context across sessions via pattern resonance."
 readme = "README.md"
 requires-python = ">=3.11"
 license = {text = "MIT"}
 authors = [
     {name = "Felipe Farías Alfaro"}
 ]
-keywords = ["memory", "ai", "agents", "spreading-activation", "knowledge-graph", "mcp"]
+keywords = ["memory", "ai", "agents", "holographic", "mcp", "context", "llm", "vector-symbolic"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
 dependencies = [
     "click>=8.1",
     "numpy>=1.24",
