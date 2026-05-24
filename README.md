@@ -39,16 +39,24 @@
 GLIA is installed **once** on your machine as a global tool.
 
 ```bash
-# Basic install (Gemini support included)
-pip install -e .
+# Install from PyPI (Gemini mode)
+pip install glia-memory
 
 # With OpenAI support
-pip install -e ".[openai]"
+pip install glia-memory[openai]
 
 # With Anthropic (Claude) support
-pip install -e ".[anthropic]"
+pip install glia-memory[anthropic]
 
 # All providers
+pip install glia-memory[all]
+```
+
+Or install from source (for development):
+
+```bash
+git clone https://github.com/FelipeFariasAlfaro/glia.git
+cd glia
 pip install -e ".[all]"
 ```
 
@@ -108,16 +116,52 @@ python -m glia hook
 
 | Command | What it does | Cost |
 |---|---|---|
-| `python -m glia init` | Initialize GLIA in the current directory | Free |
-| `python -m glia scan` | Scan project with AST (all languages) | Free |
-| `python -m glia recall "query"` | Retrieve by resonance | Free |
-| `python -m glia learn "text"` | Teach new knowledge (AI distillation) | Tokens |
-| `python -m glia stats` | Memory statistics | Free |
-| `python -m glia forget` | Apply temporal decay | Free |
-| `python -m glia changes` | Detect manually modified files | Free |
-| `python -m glia hook` | Install post-commit git hook | Free |
-| `python -m glia serve` | Start MCP server | Free |
-| `python -m glia context "query"` | Get raw context to inject into LLM | Free |
+| `glia init` | Initialize GLIA in the current directory | Free |
+| `glia scan` | Scan project with AST (all languages) | Free |
+| `glia recall "query"` | Retrieve by resonance | Free |
+| `glia learn "text"` | Teach new knowledge (AI distillation) | Tokens |
+| `glia watch` | Monitor files and re-scan on save (real-time) | Free |
+| `glia stats` | Memory statistics | Free |
+| `glia forget` | Apply temporal decay | Free |
+| `glia changes` | Detect manually modified files | Free |
+| `glia hook` | Install post-commit git hook | Free |
+| `glia serve` | Start MCP server | Free |
+| `glia context "query"` | Get raw context to inject into LLM | Free |
+
+### Command Details
+
+**`glia init`**
+Creates a `.glia/` folder in your project with the memory database. Run this once per project.
+
+**`glia scan`**
+Parses all source files using AST (Abstract Syntax Tree) and stores the structure (functions, classes, methods, imports) as glyphs in memory. Incremental — only re-scans files that changed since last scan. Supports 15+ languages.
+
+**`glia recall "query"`**
+Encodes your query as a vector and finds patterns that resonate with it. Returns a cognitive map showing which concepts matched and where to find them. No AI needed — pure math.
+
+**`glia learn "text"`**
+Sends text to your configured AI provider (Gemini/OpenAI/Claude) which distills it into concepts and relationships, then stores them as glyphs. Use this for knowledge that isn't in the code: bug explanations, architectural decisions, business rules.
+
+**`glia watch`**
+Runs in the background monitoring your project folder. When you save a file, it automatically re-scans it with AST (free). Keeps memory in sync with your code in real-time without manual intervention.
+
+**`glia stats`**
+Shows how many concepts (glyphs) are stored, the vector dimension, and number of regions.
+
+**`glia forget`**
+Applies temporal decay to all glyphs. Patterns that haven't been used lose magnitude. Patterns with zero magnitude are effectively forgotten. Use this periodically to keep memory clean.
+
+**`glia changes`**
+Compares file hashes against the last scan to detect which files were modified manually. Useful to know what changed between sessions.
+
+**`glia hook`**
+Installs a git post-commit hook that automatically calls `glia learn` with the commit message and changed files after each commit. This captures the *intent* behind changes (costs tokens per commit).
+
+**`glia serve`**
+Starts the MCP server on stdio transport. Used by IDEs (Kiro, Cursor, Cline, etc.) to connect to GLIA.
+
+**`glia context "query"`**
+Like `recall` but outputs only the raw context string (no formatting). Designed for piping into other tools or LLM prompts.
 
 ---
 

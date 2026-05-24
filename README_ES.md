@@ -39,16 +39,24 @@
 GLIA se instala **una vez** en tu máquina como herramienta global.
 
 ```bash
-# Instalación básica (incluye soporte Gemini)
-pip install -e .
+# Instalar desde PyPI (Gemni)
+pip install glia-memory
 
 # Con soporte OpenAI
-pip install -e ".[openai]"
+pip install glia-memory[openai]
 
 # Con soporte Anthropic (Claude)
-pip install -e ".[anthropic]"
+pip install glia-memory[anthropic]
 
 # Todos los providers
+pip install glia-memory[all]
+```
+
+O instalar desde el código fuente (para desarrollo):
+
+```bash
+git clone https://github.com/FelipeFariasAlfaro/glia.git
+cd glia
 pip install -e ".[all]"
 ```
 
@@ -109,16 +117,52 @@ python -m glia hook
 
 | Comando | Qué hace | Costo |
 |---|---|---|
-| `python -m glia init` | Inicializar GLIA en el directorio actual | Gratis |
-| `python -m glia scan` | Escanear proyecto con AST (todos los lenguajes) | Gratis |
-| `python -m glia recall "query"` | Recuperar por resonancia | Gratis |
-| `python -m glia learn "texto"` | Enseñar conocimiento nuevo (destilación IA) | Tokens |
-| `python -m glia stats` | Estadísticas de la memoria | Gratis |
-| `python -m glia forget` | Aplicar decaimiento temporal | Gratis |
-| `python -m glia changes` | Detectar archivos modificados manualmente | Gratis |
-| `python -m glia hook` | Instalar git hook post-commit | Gratis |
-| `python -m glia serve` | Iniciar servidor MCP | Gratis |
-| `python -m glia context "query"` | Obtener contexto crudo para inyectar en LLM | Gratis |
+| `glia init` | Inicializar GLIA en el directorio actual | Gratis |
+| `glia scan` | Escanear proyecto con AST (todos los lenguajes) | Gratis |
+| `glia recall "query"` | Recuperar por resonancia | Gratis |
+| `glia learn "texto"` | Enseñar conocimiento nuevo (destilación IA) | Tokens |
+| `glia watch` | Monitorear archivos y re-escanear al guardar (tiempo real) | Gratis |
+| `glia stats` | Estadísticas de la memoria | Gratis |
+| `glia forget` | Aplicar decaimiento temporal | Gratis |
+| `glia changes` | Detectar archivos modificados manualmente | Gratis |
+| `glia hook` | Instalar git hook post-commit | Gratis |
+| `glia serve` | Iniciar servidor MCP | Gratis |
+| `glia context "query"` | Obtener contexto crudo para inyectar en LLM | Gratis |
+
+### Detalle de comandos
+
+**`glia init`**
+Crea una carpeta `.glia/` en tu proyecto con la base de datos de memoria. Se ejecuta una vez por proyecto.
+
+**`glia scan`**
+Parsea todos los archivos fuente usando AST (Abstract Syntax Tree) y almacena la estructura (funciones, clases, métodos, imports) como glyphs en la memoria. Incremental — solo re-escanea archivos que cambiaron desde el último scan. Soporta 15+ lenguajes.
+
+**`glia recall "query"`**
+Codifica tu consulta como vector y encuentra patrones que resuenan con ella. Devuelve un mapa cognitivo mostrando qué conceptos coincidieron y dónde encontrarlos. No necesita IA — pura matemática.
+
+**`glia learn "texto"`**
+Envía texto a tu provider de IA configurado (Gemini/OpenAI/Claude) que lo destila en conceptos y relaciones, luego los almacena como glyphs. Úsalo para conocimiento que no está en el código: explicaciones de bugs, decisiones arquitectónicas, reglas de negocio.
+
+**`glia watch`**
+Corre en segundo plano monitoreando la carpeta del proyecto. Cuando guardas un archivo, automáticamente lo re-escanea con AST (gratis). Mantiene la memoria sincronizada con tu código en tiempo real sin intervención manual.
+
+**`glia stats`**
+Muestra cuántos conceptos (glyphs) hay almacenados, la dimensión vectorial y el número de regiones.
+
+**`glia forget`**
+Aplica decaimiento temporal a todos los glyphs. Los patrones que no se han usado pierden magnitud. Los que llegan a magnitud cero se olvidan efectivamente. Úsalo periódicamente para mantener la memoria limpia.
+
+**`glia changes`**
+Compara hashes de archivos contra el último scan para detectar cuáles fueron modificados manualmente. Útil para saber qué cambió entre sesiones.
+
+**`glia hook`**
+Instala un git hook post-commit que automáticamente llama `glia learn` con el mensaje del commit y los archivos cambiados después de cada commit. Esto captura la *intención* detrás de los cambios (cuesta tokens por commit).
+
+**`glia serve`**
+Inicia el servidor MCP en transporte stdio. Lo usan los IDEs (Kiro, Cursor, Cline, etc.) para conectarse a GLIA.
+
+**`glia context "query"`**
+Como `recall` pero solo muestra el string de contexto crudo (sin formato). Diseñado para pipear a otras herramientas o prompts de LLM.
 
 ---
 
