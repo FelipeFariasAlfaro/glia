@@ -2,6 +2,7 @@ import os
 import requests
 import json
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, UploadFile, File
+from fastapi.responses import HTMLResponse
 from pydantic import BaseModel
 from typing import Optional, List
 from pathlib import Path
@@ -42,9 +43,93 @@ class LearnRequest(BaseModel):
     content: str
     source: Optional[str] = "cloud-api"
 
-@app.get("/")
-async def root():
-    return {"status": "online", "engine": "GLIA Holographic Memory", "version": "v2"}
+class SimulateReviewRequest(BaseModel):
+    diff: str
+    top_k: Optional[int] = 3
+
+@app.get("/", response_class=HTMLResponse)
+async def root(request: Request):
+    """Serves the interactive playground if visited via a browser, else returns API info."""
+    accept = request.headers.get("accept", "")
+    if "text/html" in accept:
+        html_path = Path(__file__).parent / "index.html"
+        if html_path.exists():
+            return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    return HTMLResponse(content="<h1>GLIA Memory API Online</h1><p>Visit this URL in a web browser to open the Interactive Playground, or use /playground.</p>")
+
+@app.get("/playground", response_class=HTMLResponse)
+async def playground():
+    """Serves the Interactive Playground UI directly."""
+    html_path = Path(__file__).parent / "index.html"
+    if html_path.exists():
+        return HTMLResponse(content=html_path.read_text(encoding="utf-8"))
+    raise HTTPException(status_code=404, detail="Playground UI file index.html not found.")
+
+@app.post("/simulate-review")
+async def simulate_review(request: SimulateReviewRequest):
+    """Runs a simulated code review using GLIA memory resonance and Gemini reasoning."""
+    try:
+        # 1. Recall memory (Holographic query based on code changes)
+        memory_result = brain.recall(request.diff, top_k=request.top_k)
+        historical_context = memory_result.get("context", "No relevant history found.")
+        activated_nodes = memory_result.get("activated_nodes", [])
+        
+        # 2. Ask Gemini to reason and decide
+        prompt = f"""
+        You are a Senior Tech Lead. Perform an automated review of this simulated Git diff.
+        
+        CODE CHANGES:
+        {request.diff[:5000]}
+        
+        HISTORICAL CONTEXT FROM GLIA MEMORY:
+        {historical_context}
+        
+        If the code violates past architectural rules or repeats known bugs, 
+        provide a firm technical rejection. Be extremely specific about which past incidents or rules are being violated and how.
+        If it does not violate anything and is clean, approve it.
+        
+        Format your response as a markdown comment suitable for GitLab.
+        """
+        
+        response = ai.models.generate_content(
+            model=GLIA_MODEL,
+            contents=prompt
+        )
+        
+        return {
+            "status": "success",
+            "activated_nodes": activated_nodes,
+            "historical_context": historical_context,
+            "review": response.text
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/seed-presets")
+async def seed_presets():
+    """Seeds default architectural incidents into the GLIA holographic substrate."""
+    try:
+        presets = [
+            "Incident #402: RULE: Never use JSON.stringify in payment logs. Use CustomLogger.serialize() instead to prevent leakage of customer credentials or PII.",
+            "Incident #112: RULE: Always close PostgreSQL database connections inside a finally block to prevent connection pool exhaustion under high load.",
+            "Incident #309: RULE: All integration APIs with Stripe must catch StripeError specifically and log the stripe-request-id for troubleshooting.",
+            "Architecture Decision AD-08: RULE: Do not import raw jwt library inside web controllers. Use TokenService.verify_token() for unified signature and claim checks."
+        ]
+        seeded_concepts = []
+        for preset in presets:
+            res = brain.learn(preset, source="hackathon-preset-seeder")
+            seeded_concepts.append({
+                "concepts": res.get("concepts", []),
+                "summary": res.get("summary", "")
+            })
+        return {
+            "status": "success",
+            "message": "Holographic memory seeded with standard rules",
+            "seeded": seeded_concepts,
+            "stats": brain.stats()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.post("/recall")
 async def recall(request: QueryRequest):

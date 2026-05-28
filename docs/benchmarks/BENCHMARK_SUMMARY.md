@@ -51,12 +51,12 @@ Tiempo para procesar una query localmente. Sin llamadas de red.
 
 ## Sistemas Comparados
 
-| Sistema | Qué es | Costo | Requiere API Key |
-|---------|--------|-------|------------------|
-| **GLIA** | Memoria Holográfica Distribuida. Hash encoding + sinónimos + stemming + holographic unbinding | $0 | No |
-| **Graph (SA)** | Grafo tradicional con nodos + edges + spreading activation (BFS). El tipo de arquitectura que usan la mayoría de knowledge graphs | $0 | No |
-| **BM25** | Búsqueda por keywords (mismo algoritmo que Elasticsearch). El baseline que cualquier sistema debe superar | $0 | No |
-| **RAG (Embeddings)** | Retrieval-Augmented Generation con embeddings semánticos de Gemini. El estándar actual de la industria | ~$0.001/query | Sí |
+| Sistema              | Qué es                                                                                                                         | Costo         | Requiere API Key |
+|----------------------|--------------------------------------------------------------------------------------------------------------------------------|---------------|------------------|
+| **GLIA**             | Memoria Holográfica Distribuida. Hash encoding + sinónimos + stemming + holographic unbinding                                   | $0            | No               |
+| **Graph (SA)**       | Grafo tradicional con nodos + edges + spreading activation (BFS). El tipo de arquitectura que usan la mayoría de knowledge graphs | $0            | No               |
+| **BM25**             | Búsqueda por keywords (mismo algoritmo que Elasticsearch). El baseline que cualquier sistema debe superar                       | $0            | No               |
+| **RAG (Embeddings)** | Retrieval-Augmented Generation con embeddings semánticos de Gemini. El estándar actual de la industria                         | ~$0.001/query | Sí               |
 
 ---
 
@@ -64,48 +64,48 @@ Tiempo para procesar una query localmente. Sin llamadas de red.
 
 ### MRR (mayor es mejor)
 
-| Proyecto | GLIA | Graph (SA) | BM25 | GLIA vs Graph | GLIA vs BM25 |
-|----------|------|-----------|------|---------------|--------------|
-| E-Commerce (31 archivos) | **0.771** | 0.409 | 0.785 | +88.6% | -1.7% |
-| ML Pipeline (27 archivos) | **0.904** | 0.203 | 0.941 | +344.2% | -3.9% |
-| Frontend React (32 archivos) | **0.877** | 0.421 | 0.885 | +108.1% | -0.9% |
-| **Promedio** | **0.851** | 0.344 | 0.870 | **+147.4%** | **-2.2%** |
+| Proyecto                     | GLIA      | Graph (SA) | BM25      | GLIA vs Graph | GLIA vs BM25 |
+|------------------------------|-----------|------------|-----------|---------------|--------------|
+| E-Commerce (31 archivos)     | **0.771** | 0.409      | 0.785     | +88.6%        | -1.7%        |
+| ML Pipeline (27 archivos)    | **0.904** | 0.203      | 0.941     | +344.2%       | -3.9%        |
+| Frontend React (32 archivos) | **0.877** | 0.421      | 0.885     | +108.1%       | -0.9%        |
+| **Promedio**                 | **0.851** | 0.344      | 0.870     | **+147.4%**   | **-2.2%**    |
 
 ### nDCG@10 (mayor es mejor)
 
-| Proyecto | GLIA | Graph (SA) | BM25 |
-|----------|------|-----------|------|
-| E-Commerce | **0.824** | 0.497 | 0.790 |
-| ML Pipeline | **0.925** | 0.278 | 0.922 |
-| Frontend React | **0.890** | 0.538 | 0.903 |
+| Proyecto       | GLIA      | Graph (SA) | BM25      |
+|----------------|-----------|------------|-----------|
+| E-Commerce     | **0.824** | 0.497      | 0.790     |
+| ML Pipeline    | **0.925** | 0.278      | 0.922     |
+| Frontend React | **0.890** | 0.538      | 0.903     |
 
 ### Precision@1 (mayor es mejor)
 
-| Proyecto | GLIA | Graph (SA) | BM25 |
-|----------|------|-----------|------|
-| E-Commerce | **0.667** | 0.191 | 0.667 |
-| ML Pipeline | **0.857** | 0.095 | 0.905 |
-| Frontend React | **0.810** | 0.238 | 0.810 |
+| Proyecto       | GLIA      | Graph (SA) | BM25      |
+|----------------|-----------|------------|-----------|
+| E-Commerce     | **0.667** | 0.191      | 0.667     |
+| ML Pipeline    | **0.857** | 0.095      | 0.905     |
+| Frontend React | **0.810** | 0.238      | 0.810     |
 
 ---
 
 ## Eficiencia de Tokens (tiktoken cl100k_base)
 
-| Proyecto | Contexto Completo | GLIA Promedio | Ahorro | Compresión |
-|----------|-------------------|---------------|--------|------------|
-| E-Commerce | 29,690 tokens | 543 tokens | **98.2%** | 54.7x |
-| ML Pipeline | 31,682 tokens | 602 tokens | **98.1%** | 52.6x |
-| Frontend React | 23,183 tokens | 689 tokens | **97.0%** | 33.7x |
+| Proyecto       | Contexto Completo | GLIA Promedio | Ahorro    | Compresión |
+|----------------|-------------------|---------------|-----------|------------|
+| E-Commerce     | 29,690 tokens      | 543 tokens    | **98.2%** | 54.7x      |
+| ML Pipeline    | 31,682 tokens      | 602 tokens    | **98.1%** | 52.6x      |
+| Frontend React | 23,183 tokens      | 689 tokens    | **97.0%** | 33.7x      |
 
 ---
 
 ## Latencia
 
-| Proyecto | Glyphs | Scan Time | Query Latency |
-|----------|--------|-----------|---------------|
-| E-Commerce | 346 | 4.3s | **111ms** |
-| ML Pipeline | 375 | 4.2s | **117ms** |
-| Frontend React | 125 | 1.6s | **54ms** |
+| Proyecto       | Glyphs | Scan Time | Query Latency |
+|----------------|--------|-----------|---------------|
+| E-Commerce     | 346    | 4.3s      | **111ms**     |
+| ML Pipeline    | 375    | 4.2s      | **117ms**     |
+| Frontend React | 125    | 1.6s      | **54ms**      |
 
 ---
 
@@ -113,12 +113,12 @@ Tiempo para procesar una query localmente. Sin llamadas de red.
 
 Comparación directa en E-Commerce:
 
-| Sistema | MRR | Costo/query | Requiere API |
-|---------|-----|-------------|--------------|
-| RAG (Gemini embedding-001) | **0.873** | ~$0.001 | Sí |
-| BM25 | 0.861 | $0 | No |
-| GLIA + embeddings (modo enhanced) | 0.835 | ~$0.001 | Sí |
-| **GLIA (local, sin embeddings)** | 0.783 | **$0** | **No** |
+| Sistema                           | MRR       | Costo/query | Requiere API |
+|-----------------------------------|-----------|-------------|--------------|
+| RAG (Gemini embedding-001)        | **0.873** | ~$0.001     | Sí           |
+| BM25                              | 0.861     | $0          | No           |
+| GLIA + embeddings (modo enhanced) | 0.835     | ~$0.001     | Sí           |
+| **GLIA (local, sin embeddings)**   | 0.783     | **$0**      | **No**       |
 
 ---
 

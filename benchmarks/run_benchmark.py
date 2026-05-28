@@ -290,7 +290,7 @@ def benchmark_speed(brain: GliaBrain, ground_truth: dict):
 
 
 def main():
-    print("🧠 GLIA Benchmark Suite")
+    print("GLIA Benchmark Suite")
     print("=" * 70)
 
     # Load ground truth
@@ -301,7 +301,7 @@ def main():
     print("\nSetting up GLIA on benchmark project...")
     brain, scan_stats, scan_time = setup_glia()
     print(f"  Scan time: {scan_time:.2f}s")
-    print(f"  Glyphs created: {scan_stats['learned']} files → {brain.stats()['nodes']} patterns")
+    print(f"  Glyphs created: {scan_stats['learned']} files -> {brain.stats()['nodes']} patterns")
 
     project_path = Path(__file__).parent.parent / project_name
 

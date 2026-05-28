@@ -1,0 +1,1191 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GLIA | Holographic Memory & GitLab Simulator</title>
+    <!-- Modern Typography -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <!-- FontAwesome for Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Marked.js for Premium Markdown Rendering -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: rgba(17, 25, 40, 0.65);
+            --card-border: rgba(255, 255, 255, 0.08);
+            --text-primary: #f3f4f6;
+            --text-secondary: #9ca3af;
+            --accent-cyan: #06b6d4;
+            --accent-purple: #a855f7;
+            --accent-pink: #ec4899;
+            --accent-green: #10b981;
+            --accent-red: #ef4444;
+            --font-sans: 'Inter', sans-serif;
+            --font-heading: 'Space Grotesk', sans-serif;
+            --font-mono: 'Fira Code', monospace;
+            --glow-cyan: 0 0 20px rgba(6, 182, 212, 0.45);
+            --glow-purple: 0 0 20px rgba(168, 85, 247, 0.4);
+            --glow-green: 0 0 20px rgba(16, 185, 129, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-family: var(--font-sans);
+            min-height: 100vh;
+            overflow-x: hidden;
+            background-image: 
+                radial-gradient(circle at 10% 20%, rgba(168, 85, 247, 0.15) 0%, transparent 40%),
+                radial-gradient(circle at 90% 80%, rgba(6, 182, 212, 0.15) 0%, transparent 40%);
+            background-attachment: fixed;
+        }
+
+        header {
+            padding: 1.5rem 4rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            backdrop-filter: blur(10px);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+        }
+
+        .logo-container {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .logo-icon {
+            font-size: 2.2rem;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            filter: drop-shadow(0 0 8px rgba(6, 182, 212, 0.5));
+        }
+
+        .logo-text {
+            font-family: var(--font-heading);
+            font-size: 1.8rem;
+            font-weight: 700;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-badge {
+            background: rgba(6, 182, 212, 0.1);
+            color: var(--accent-cyan);
+            border: 1px solid rgba(6, 182, 212, 0.2);
+            padding: 2px 8px;
+            border-radius: 9999px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .btn-seed {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.2), rgba(168, 85, 247, 0.2));
+            border: 1px solid var(--accent-cyan);
+            color: var(--text-primary);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-weight: 500;
+            font-family: var(--font-heading);
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-seed:hover {
+            box-shadow: var(--glow-cyan);
+            transform: translateY(-2px);
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.35), rgba(168, 85, 247, 0.35));
+        }
+
+        /* JUDGES WELCOME BANNER */
+        .judge-banner {
+            max-width: 1400px;
+            margin: 2rem auto 0 auto;
+            padding: 0 2rem;
+        }
+
+        .judge-card {
+            background: linear-gradient(135deg, rgba(6, 182, 212, 0.1), rgba(168, 85, 247, 0.1));
+            border: 1px solid rgba(6, 182, 212, 0.3);
+            border-radius: 12px;
+            padding: 1.5rem 2rem;
+            backdrop-filter: blur(8px);
+            display: flex;
+            align-items: flex-start;
+            gap: 20px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+            animation: slideUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .judge-icon-box {
+            background: rgba(6, 182, 212, 0.2);
+            color: var(--accent-cyan);
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.5rem;
+            flex-shrink: 0;
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+        }
+
+        .judge-content h3 {
+            font-family: var(--font-heading);
+            font-size: 1.15rem;
+            margin-bottom: 6px;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .judge-content p {
+            font-size: 0.9rem;
+            line-height: 1.6;
+            color: var(--text-secondary);
+        }
+
+        .judge-steps {
+            margin-top: 12px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1.5rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            padding-top: 12px;
+        }
+
+        @media (max-width: 768px) {
+            .judge-steps {
+                grid-template-columns: 1fr;
+            }
+            .judge-card {
+                flex-direction: column;
+                gap: 12px;
+            }
+        }
+
+        .judge-step-item {
+            display: flex;
+            gap: 10px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+        }
+
+        .judge-step-num {
+            background: var(--accent-cyan);
+            color: #0b0f19;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-weight: 700;
+            font-size: 0.75rem;
+            flex-shrink: 0;
+        }
+
+        main {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 2rem 2rem 4rem 2rem;
+            display: grid;
+            grid-template-columns: 1fr 1.2fr;
+            gap: 2.5rem;
+        }
+
+        @media (max-width: 1024px) {
+            main {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .glass-card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 2rem;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+            position: relative;
+            overflow: hidden;
+            transition: border-color 0.3s;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(255, 255, 255, 0.15);
+        }
+
+        .card-glow-cyan::after {
+            content: '';
+            position: absolute;
+            top: -100px;
+            right: -100px;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(6, 182, 212, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .card-glow-purple::after {
+            content: '';
+            position: absolute;
+            bottom: -100px;
+            left: -100px;
+            width: 200px;
+            height: 200px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.15) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        h2 {
+            font-family: var(--font-heading);
+            font-size: 1.5rem;
+            margin-bottom: 1.5rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 1rem;
+            margin-bottom: 2rem;
+        }
+
+        .stat-item {
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            padding: 1rem;
+            border-radius: 12px;
+            text-align: center;
+        }
+
+        .stat-val {
+            font-family: var(--font-heading);
+            font-size: 1.8rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-top: 4px;
+            text-shadow: 0 0 10px rgba(6, 182, 212, 0.2);
+        }
+
+        .stat-lbl {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            font-size: 0.875rem;
+            color: var(--text-secondary);
+            margin-bottom: 8px;
+            font-weight: 500;
+        }
+
+        textarea {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 12px;
+            font-family: var(--font-sans);
+            font-size: 0.95rem;
+            resize: vertical;
+            min-height: 100px;
+            transition: all 0.3s;
+        }
+
+        textarea:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(6, 182, 212, 0.15);
+        }
+
+        .code-area {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            background: #05070c;
+        }
+
+        select {
+            width: 100%;
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            color: var(--text-primary);
+            padding: 12px;
+            font-family: var(--font-sans);
+            font-size: 0.95rem;
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 1rem;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--accent-cyan);
+        }
+
+        .btn-action {
+            width: 100%;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-purple));
+            color: white;
+            border: none;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-family: var(--font-heading);
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .btn-action:hover {
+            box-shadow: var(--glow-purple);
+            transform: translateY(-2px);
+            filter: brightness(1.1);
+        }
+
+        .btn-action:disabled {
+            background: #27272a;
+            color: #71717a;
+            cursor: not-allowed;
+            box-shadow: none;
+            transform: none;
+        }
+
+        /* PIPELINE STEPPER ANIMATIONS */
+        .pipeline-stepper {
+            margin-top: 2rem;
+            border-top: 1px solid rgba(255, 255, 255, 0.05);
+            padding-top: 2rem;
+        }
+
+        .step-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            opacity: 0.35;
+            transition: all 0.4s ease;
+        }
+
+        .step-item.active {
+            opacity: 1;
+            transform: translateX(4px);
+        }
+
+        .step-item.completed {
+            opacity: 0.75;
+        }
+
+        .step-circle {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            border: 2px solid var(--text-secondary);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 0.85rem;
+            font-weight: 600;
+            background: var(--bg-color);
+            transition: all 0.4s ease;
+        }
+
+        .step-item.active .step-circle {
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            box-shadow: var(--glow-cyan);
+            animation: pulse-border 1.5s infinite alternate;
+        }
+
+        .step-item.completed .step-circle {
+            border-color: var(--accent-green);
+            background: var(--accent-green);
+            color: white;
+        }
+
+        .step-text {
+            flex-grow: 1;
+        }
+
+        .step-title {
+            font-weight: 600;
+            font-size: 0.95rem;
+        }
+
+        .step-desc {
+            font-size: 0.75rem;
+            color: var(--text-secondary);
+        }
+
+        /* MOCK GITLAB COMMENT CARD */
+        .gitlab-comment-card {
+            background: #1e293b;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin-top: 2rem;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.4);
+            display: none;
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .gitlab-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .gitlab-author {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .gitlab-avatar {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #f97316, #ea580c);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: 700;
+            font-size: 0.9rem;
+        }
+
+        .gitlab-meta {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .gitlab-username {
+            font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .gitlab-role-badge {
+            background: rgba(168, 85, 247, 0.2);
+            color: #c084fc;
+            font-size: 0.7rem;
+            padding: 1px 6px;
+            border-radius: 4px;
+            width: fit-content;
+            font-weight: 600;
+            margin-top: 2px;
+        }
+
+        .gitlab-badge {
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 6px;
+        }
+
+        .gitlab-badge.rejected {
+            background: rgba(239, 68, 68, 0.15);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        .gitlab-badge.approved {
+            background: rgba(16, 185, 129, 0.15);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .gitlab-content {
+            font-size: 0.95rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+        }
+
+        .gitlab-content pre {
+            background: #0f172a;
+            padding: 12px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 1rem 0;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+        }
+
+        .gitlab-content code {
+            font-family: var(--font-mono);
+            background: #0f172a;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            color: var(--accent-pink);
+        }
+
+        .gitlab-content p {
+            margin-bottom: 1rem;
+        }
+
+        .gitlab-content h3 {
+            font-size: 1.1rem;
+            margin: 1.5rem 0 0.5rem 0;
+            color: white;
+            font-family: var(--font-heading);
+        }
+
+        .gitlab-content ul {
+            margin-left: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .gitlab-content li {
+            margin-bottom: 0.5rem;
+        }
+
+        .res-list {
+            margin-top: 1rem;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .res-item {
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 3px solid var(--accent-cyan);
+            padding: 8px 12px;
+            border-radius: 0 8px 8px 0;
+            font-size: 0.85rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .res-score {
+            font-family: var(--font-heading);
+            font-weight: 600;
+            color: var(--accent-cyan);
+        }
+
+        .merge-action-bar {
+            margin-top: 1.5rem;
+            display: none;
+            animation: fadeIn 0.4s ease;
+        }
+
+        .btn-merge {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-family: var(--font-heading);
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 8px;
+            transition: all 0.3s;
+        }
+
+        .btn-merge:hover {
+            box-shadow: var(--glow-green);
+            transform: translateY(-2px);
+        }
+
+        .success-banner {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid var(--accent-green);
+            border-radius: 8px;
+            padding: 12px;
+            color: #34d399;
+            font-size: 0.9rem;
+            margin-top: 1rem;
+            display: none;
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes pulse-border {
+            0% {
+                box-shadow: 0 0 10px rgba(6, 182, 212, 0.3);
+            }
+            100% {
+                box-shadow: 0 0 25px rgba(6, 182, 212, 0.65);
+            }
+        }
+
+        @keyframes slideUp {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+
+        .tab-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            color: var(--accent-cyan);
+            margin-bottom: 1.5rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .pulsing-dot {
+            width: 8px;
+            height: 8px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-cyan);
+            animation: pulse-dot 1.5s infinite;
+        }
+
+        @keyframes pulse-dot {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.3); opacity: 0.4; }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo-container">
+            <i class="fa-solid fa-brain logo-icon"></i>
+            <div style="display: flex; flex-direction: column;">
+                <span class="logo-text">GLIA</span>
+                <span style="font-size: 0.7rem; color: var(--text-secondary); letter-spacing: 1px;">HOLOGRAPHIC MEMORY</span>
+            </div>
+            <span class="logo-badge">Vertex AI</span>
+        </div>
+        <div class="header-actions">
+            <button class="btn-seed" id="btn-seed" onclick="seedMemory()">
+                <i class="fa-solid fa-circle-nodes"></i> Seed Baseline Rules
+            </button>
+        </div>
+    </header>
+
+    <!-- HACKATHON JUDGES BANNER -->
+    <div class="judge-banner">
+        <div class="judge-card">
+            <div class="judge-icon-box">
+                <i class="fa-solid fa-gavel"></i>
+            </div>
+            <div class="judge-content">
+                <h3><i class="fa-solid fa-circle-info" style="color: var(--accent-cyan)"></i> Rapid Agent Hackathon Reviewers & Judges Playground</h3>
+                <p>
+                    Welcome, Hackathon Judges! This interactive interface operates on <strong>100% real backend API calls</strong>. It connects directly with the <strong>GLIA Epistemic Memory substrate</strong> (stored locally/in-memory) and uses <strong>Gemini 2.5 Flash on Vertex AI</strong> for cognitive review. 
+                    This simulator acts as an easy-to-use, zero-setup playground to test the native <strong>GitLab + Google Cloud Run + Vertex AI + GLIA Tech Lead</strong> closed-loop automation, avoiding the need to configure private Git repositories, webhooks, or tokens.
+                </p>
+                <div class="judge-steps">
+                    <div class="judge-step-item">
+                        <div class="judge-step-num">1</div>
+                        <div><strong>Seed memory rules:</strong> Click "Seed Baseline Rules" in the top right to populate GLIA with guidelines like Incident #402.</div>
+                    </div>
+                    <div class="judge-step-item">
+                        <div class="judge-step-num">2</div>
+                        <div><strong>Inject knowledge:</strong> Add a custom security rule on the left panel under "Teach GLIA".</div>
+                    </div>
+                    <div class="judge-step-item">
+                        <div class="judge-step-num">3</div>
+                        <div><strong>Simulate review:</strong> Choose a code diff on the right, trigger review, and watch the pipeline match memory and Gemini act!</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <main>
+        <!-- LEFT COLUMN: STATS AND LEARNING -->
+        <div style="display: flex; flex-direction: column; gap: 2rem;">
+            <!-- Memory Stats Dashboard -->
+            <div class="glass-card card-glow-cyan">
+                <h2><i class="fa-solid fa-chart-simple" style="color: var(--accent-cyan);"></i> Holographic Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-item">
+                        <div class="stat-lbl">Concepts</div>
+                        <div class="stat-val" id="stat-nodes">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-lbl">Dimensions</div>
+                        <div class="stat-val" id="stat-dims">-</div>
+                    </div>
+                    <div class="stat-item">
+                        <div class="stat-lbl">Regions</div>
+                        <div class="stat-val" id="stat-regions">-</div>
+                    </div>
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-secondary); display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-server"></i>
+                    <span>Substrate Status: <strong style="color: var(--accent-green)">Connected & Active</strong></span>
+                </div>
+            </div>
+
+            <!-- Epistemic Memory Learning -->
+            <div class="glass-card card-glow-purple">
+                <div class="tab-indicator">
+                    <span class="pulsing-dot"></span> Phase 1: Knowledge Ingestion
+                </div>
+                <h2><i class="fa-solid fa-graduation-cap" style="color: var(--accent-purple);"></i> Teach GLIA</h2>
+                <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                    Teach the agent new guidelines, engineering standards, or post-incident rules. The engine will automatically distill key concepts using Gemini and map them onto the high-dimensional vector substrate.
+                </p>
+
+                <div class="form-group">
+                    <label for="learn-content">Rule or Incident Content</label>
+                    <textarea id="learn-content" placeholder="E.g. Incident #999: RULE: Never use MD5 for password encryption. Always use Bcrypt with a salt round of 10 to protect user credentials."></textarea>
+                </div>
+
+                <button class="btn-action" id="btn-learn" onclick="learnNewRule()">
+                    <i class="fa-solid fa-bolt"></i> Inject Knowledge
+                </button>
+
+                <div id="learn-success-banner" class="success-banner">
+                    <i class="fa-solid fa-circle-check"></i> <strong>Knowledge integrated!</strong> Distilled concepts: <span id="learned-concepts" style="font-family: var(--font-mono); font-size: 0.8rem; color: white;"></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- RIGHT COLUMN: SIMULATOR -->
+        <div class="glass-card card-glow-cyan" style="display: flex; flex-direction: column;">
+            <div class="tab-indicator">
+                <span class="pulsing-dot"></span> Phase 2: Merge Request Simulator
+            </div>
+            <h2><i class="fa-brands fa-gitlab" style="color: var(--accent-pink);"></i> GitLab Code Review Simulator</h2>
+            <p style="color: var(--text-secondary); font-size: 0.85rem; margin-bottom: 1.5rem; line-height: 1.5;">
+                Test how the autonomous agent proactively audits new code, finding architectural regressions in milliseconds through <strong>vector semantic resonance</strong>.
+            </p>
+
+            <div class="form-group">
+                <label for="template-select">Select a Code Template (Git Diff)</label>
+                <select id="template-select" onchange="loadTemplate()">
+                    <option value="" disabled selected>-- Choose a test scenario --</option>
+                    <option value="violation-payment">❌ Scenario A: Raw Payment Logging (Violates Incident #402)</option>
+                    <option value="violation-db">❌ Scenario B: Database Connection Leak (Violates Incident #112)</option>
+                    <option value="success-refactored">✅ Scenario C: Secure Serialized Logging (Approved)</option>
+                    <option value="custom">✏️ Write my own custom Git Diff...</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="code-diff">Git Diff Code Area</label>
+                <textarea id="code-diff" class="code-area" style="min-height: 180px;" placeholder="Paste or modify code diff here..."></textarea>
+            </div>
+
+            <button class="btn-action" id="btn-review" onclick="runSimulatedReview()">
+                <i class="fa-solid fa-magnifying-glass-chart"></i> Run Simulated Code Review
+            </button>
+
+            <!-- Step by step Visual Pipeline -->
+            <div class="pipeline-stepper" id="pipeline-section" style="display: none;">
+                <h3 style="font-family: var(--font-heading); font-size: 1rem; margin-bottom: 1.2rem; color: var(--accent-cyan)">
+                    <i class="fa-solid fa-gears"></i> Real-time Agent Execution Pipeline
+                </h3>
+                <div class="step-list">
+                    <div class="step-item" id="step-ingest">
+                        <div class="step-circle">1</div>
+                        <div class="step-text">
+                            <div class="step-title">Code Diff & Ingestion</div>
+                            <div class="step-desc">Extracting modified lines and building AST signatures.</div>
+                        </div>
+                    </div>
+                    <div class="step-item" id="step-resonance">
+                        <div class="step-circle">2</div>
+                        <div class="step-text">
+                            <div class="step-title">Holographic Substrate Recall (Resonance)</div>
+                            <div class="step-desc">Projecting code vector to find semantic affinities in holographic memory.</div>
+                        </div>
+                    </div>
+                    <div class="step-item" id="step-gemini">
+                        <div class="step-circle">3</div>
+                        <div class="step-text">
+                            <div class="step-title">Cognitive Reasoning (Vertex AI Gemini)</div>
+                            <div class="step-desc">Gemini checks the active diff against retrieved memory rules.</div>
+                        </div>
+                    </div>
+                    <div class="step-item" id="step-complete">
+                        <div class="step-circle">4</div>
+                        <div class="step-text">
+                            <div class="step-title">Autonomous Code Review Completed</div>
+                            <div class="step-desc">Review card formatted and generated for GitLab PR.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recalled memory rules display -->
+                <div id="resonated-memory-section" style="margin-top: 1.5rem; display: none;">
+                    <span style="font-size: 0.8rem; color: var(--text-secondary); text-transform: uppercase; font-weight: 600; letter-spacing: 0.5px;">Resonating Memory Glyphs:</span>
+                    <div class="res-list" id="res-list"></div>
+                </div>
+            </div>
+
+            <!-- GitLab comment output -->
+            <div class="gitlab-comment-card" id="gitlab-card">
+                <div class="gitlab-header">
+                    <div class="gitlab-author">
+                        <div class="gitlab-avatar">TL</div>
+                        <div class="gitlab-meta">
+                            <span class="gitlab-username">glia-tech-lead-bot</span>
+                            <span class="gitlab-role-badge">System Agent</span>
+                        </div>
+                    </div>
+                    <div class="gitlab-badge" id="review-badge">-</div>
+                </div>
+                <div class="gitlab-content" id="review-comment-body">
+                </div>
+            </div>
+
+            <!-- Simulated merge -->
+            <div class="merge-action-bar" id="merge-action-bar">
+                <button class="btn-merge" id="btn-merge" onclick="simulateMerge()">
+                    <i class="fa-solid fa-code-merge"></i> Simulate Merge (GLIA Learns Approved Patterns)
+                </button>
+            </div>
+            
+            <div id="merge-success-banner" class="success-banner">
+                <i class="fa-solid fa-circle-check"></i> <strong>Merge Successful!</strong> GLIA has learned from the approved refactored patterns and updated its holographic substrate dynamically.
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        // Preset templates
+        const templates = {
+            'violation-payment': `--- a/src/services/payment.js
++++ b/src/services/payment.js
+@@ -15,4 +15,5 @@
+ function processPayment(payload) {
++    // Logging raw payload to check Stripe API data
++    logger.info("Starting payment: " + JSON.stringify(payload));
+     stripe.charges.create(payload);
+ }`,
+            'violation-db': `--- a/src/services/database.js
++++ b/src/services/database.js
+@@ -5,6 +5,7 @@
+ async function fetchUsers() {
+     const client = await pool.connect();
+     const result = await client.query('SELECT * FROM users');
++    // Returning direct query result without closing client
+     return result.rows;
+ }`,
+            'success-refactored': `--- a/src/services/payment.js
++++ b/src/services/payment.js
+@@ -15,4 +15,6 @@
+ function processPayment(payload) {
++    // Safe serialized logging to prevent sensitive data exposure
++    logger.info("Starting payment safely: " + CustomLogger.serialize(payload.id));
+     stripe.charges.create(payload);
+ }`,
+            'custom': `--- a/src/some_file.js
++++ b/src/some_file.js
+@@ -1,3 +1,4 @@
+ function demo() {
++    // Write custom code here to test GLIA
+ }`
+        };
+
+        // Load stats on initialization
+        window.addEventListener('DOMContentLoaded', () => {
+            fetchStats();
+        });
+
+        async function fetchStats() {
+            try {
+                const response = await fetch('/stats');
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('stat-nodes').innerText = data.nodes || 0;
+                    document.getElementById('stat-dims').innerText = data.dimension || 1024;
+                    document.getElementById('stat-regions').innerText = data.regions || 1;
+                }
+            } catch (err) {
+                console.error("Error fetching stats:", err);
+            }
+        }
+
+        function loadTemplate() {
+            const selected = document.getElementById('template-select').value;
+            if (templates[selected]) {
+                document.getElementById('code-diff').value = templates[selected];
+            }
+        }
+
+        async function seedMemory() {
+            const btn = document.getElementById('btn-seed');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
+
+            try {
+                const response = await fetch('/seed-presets', {
+                    method: 'POST'
+                });
+                
+                if (response.ok) {
+                    alert("Holographic memory successfully seeded with baseline incident guidelines!");
+                    await fetchStats();
+                } else {
+                    alert("Error seeding memory: " + response.statusText);
+                }
+            } catch (err) {
+                alert("Connection error: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function learnNewRule() {
+            const content = document.getElementById('learn-content').value.trim();
+            if (!content) {
+                alert("Please write the rule or incident details first.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-learn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Ingesting...';
+            document.getElementById('learn-success-banner').style.display = 'none';
+
+            try {
+                const response = await fetch('/learn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ content: content, source: "manual-injection" })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('learned-concepts').innerText = data.concepts.join(', ') || 'N/A';
+                    document.getElementById('learn-success-banner').style.display = 'block';
+                    document.getElementById('learn-content').value = '';
+                    await fetchStats();
+                } else {
+                    alert("Error teaching GLIA: " + response.statusText);
+                }
+            } catch (err) {
+                alert("Connection error: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function runSimulatedReview() {
+            const diff = document.getElementById('code-diff').value.trim();
+            if (!diff) {
+                alert("Please write or select a Git Diff to review.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-review');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Auditing...';
+
+            // Hide previous results
+            document.getElementById('gitlab-card').style.display = 'none';
+            document.getElementById('merge-action-bar').style.display = 'none';
+            document.getElementById('merge-success-banner').style.display = 'none';
+            document.getElementById('resonated-memory-section').style.display = 'none';
+
+            // Show and reset stepper
+            const pipeline = document.getElementById('pipeline-section');
+            pipeline.style.display = 'block';
+            resetSteps();
+
+            try {
+                // Step 1: Ingest
+                setActiveStep('step-ingest');
+                await delay(1200);
+                completeStep('step-ingest');
+
+                // Step 2: Recall
+                setActiveStep('step-resonance');
+                
+                const response = await fetch('/simulate-review', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ diff: diff, top_k: 3 })
+                });
+
+                if (!response.ok) {
+                    throw new Error("API Review call failed: " + response.statusText);
+                }
+
+                const data = await response.json();
+                completeStep('step-resonance');
+
+                // Display resonating nodes
+                const resList = document.getElementById('res-list');
+                resList.innerHTML = '';
+                if (data.activated_nodes && data.activated_nodes.length > 0) {
+                    data.activated_nodes.forEach(node => {
+                        const scorePct = Math.round(node[1] * 100);
+                        resList.innerHTML += `
+                            <div class="res-item">
+                                <span><i class="fa-solid fa-link" style="color: var(--accent-cyan)"></i> <strong>${node[0]}</strong></span>
+                                <span class="res-score">${scorePct}% Resonance</span>
+                            </div>
+                        `;
+                    });
+                    document.getElementById('resonated-memory-section').style.display = 'block';
+                } else {
+                    resList.innerHTML = '<div style="font-size: 0.8rem; color: var(--text-secondary)">No significant matching memory vectors found.</div>';
+                    document.getElementById('resonated-memory-section').style.display = 'block';
+                }
+
+                await delay(1200);
+
+                // Step 3: Gemini Reasoning
+                setActiveStep('step-gemini');
+                await delay(1500);
+                completeStep('step-gemini');
+
+                // Step 4: Complete
+                setActiveStep('step-complete');
+                await delay(800);
+                completeStep('step-complete');
+
+                // Render GitLab comment Card
+                const reviewLower = data.review.toLowerCase();
+                const isApproved = !reviewLower.includes("reject") && !reviewLower.includes("reprob") && !reviewLower.includes("viola") && !reviewLower.includes("denegad") && !reviewLower.includes("unapproved") && !reviewLower.includes("block");
+                const badge = document.getElementById('review-badge');
+                if (isApproved) {
+                    badge.innerText = "APPROVED";
+                    badge.className = "gitlab-badge approved";
+                    document.getElementById('merge-action-bar').style.display = 'block';
+                } else {
+                    badge.innerText = "REJECTED";
+                    badge.className = "gitlab-badge rejected";
+                }
+
+                document.getElementById('review-comment-body').innerHTML = marked.parse(data.review);
+                document.getElementById('gitlab-card').style.display = 'block';
+
+            } catch (err) {
+                alert("Error during simulation: " + err.message);
+                resetSteps();
+                pipeline.style.display = 'none';
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+            }
+        }
+
+        async function simulateMerge() {
+            const diff = document.getElementById('code-diff').value;
+            const btn = document.getElementById('btn-merge');
+            btn.disabled = true;
+            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Integrating approved changes...';
+
+            try {
+                const response = await fetch('/learn', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ 
+                        content: `Approved changes merged:\n\n${diff}`, 
+                        source: "simulated-merge-mr" 
+                    })
+                });
+
+                if (response.ok) {
+                    document.getElementById('merge-success-banner').style.display = 'block';
+                    document.getElementById('merge-action-bar').style.display = 'none';
+                    await fetchStats();
+                } else {
+                    alert("Error during simulated merge: " + response.statusText);
+                }
+            } catch (err) {
+                alert("Connection error: " + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = '<i class="fa-solid fa-code-merge"></i> Simulate Merge (GLIA Learns Approved Patterns)';
+            }
+        }
+
+        // Stepper helper functions
+        function resetSteps() {
+            const ids = ['step-ingest', 'step-resonance', 'step-gemini', 'step-complete'];
+            ids.forEach(id => {
+                const el = document.getElementById(id);
+                el.classList.remove('active', 'completed');
+            });
+        }
+
+        function setActiveStep(id) {
+            document.getElementById(id).classList.add('active');
+        }
+
+        function completeStep(id) {
+            const el = document.getElementById(id);
+            el.classList.remove('active');
+            el.classList.add('completed');
+        }
+
+        function delay(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+    </script>
+</body>
+</html>

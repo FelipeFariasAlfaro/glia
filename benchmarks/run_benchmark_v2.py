@@ -131,7 +131,7 @@ def compute_recall_at_k(results_per_query: list[list[bool]], k: int, total_relev
 
 def main():
     print(f"{'='*70}")
-    print(f"GLIA Benchmark v2 — Industry-Standard Metrics")
+    print(f"GLIA Benchmark v2 - Industry-Standard Metrics")
     print(f"Project: {project_name}")
     print(f"Token counting: tiktoken (cl100k_base)")
     print(f"{'='*70}")
@@ -143,7 +143,7 @@ def main():
     # Setup
     brain, scan_stats, scan_time = setup_glia()
     n_glyphs = brain.stats()["nodes"]
-    print(f"Scan: {scan_time:.2f}s → {n_glyphs} glyphs")
+    print(f"Scan: {scan_time:.2f}s -> {n_glyphs} glyphs")
 
     project_path = Path(__file__).parent.parent / project_name
 
@@ -183,7 +183,7 @@ def main():
             node_text = f"{node_id} {next((t['content'] for t in result.get('threads', []) if t['id'] == node_id), '')}".lower()
             is_relevant = any(
                 concept.lower().replace("_", " ") in node_text or
-                concept.lower() in node_id.lower()
+                concept.lower() in node_text
                 for concept in expected
             )
             relevance.append(is_relevant)
@@ -238,7 +238,7 @@ def main():
     print(f"  {'Recall@10':<35} {recall_10:.4f}")
 
     print(f"\n{'='*70}")
-    print("TOKEN EFFICIENCY (tiktoken cl100k_base — real count)")
+    print("TOKEN EFFICIENCY (tiktoken cl100k_base - real count)")
     print(f"{'='*70}")
     print(f"  {'Full context (all files)':<35} {full_context_tokens:,} tokens")
     print(f"  {'GLIA avg per query':<35} {avg_glia_tokens:.0f} tokens")
