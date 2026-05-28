@@ -817,6 +817,85 @@
             color: var(--text-primary);
         }
 
+        /* SEEDING PROGRESS MODAL */
+        .seeding-modal-box {
+            background: #111827;
+            border: 1px solid rgba(6, 182, 212, 0.35);
+            border-radius: 16px;
+            padding: 2rem 2.5rem;
+            max-width: 460px;
+            width: 90%;
+            box-shadow: 0 0 40px rgba(6, 182, 212, 0.12), 0 20px 60px rgba(0,0,0,0.5);
+            animation: slideUp 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+
+        .seeding-spinner {
+            font-size: 2.5rem;
+            margin-bottom: 1rem;
+            display: block;
+            animation: spin 1.2s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .seeding-title {
+            font-family: var(--font-heading);
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--accent-cyan);
+            margin-bottom: 0.5rem;
+        }
+
+        .seeding-subtitle {
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            margin-bottom: 1.5rem;
+            line-height: 1.5;
+        }
+
+        .seeding-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            text-align: left;
+        }
+
+        .seeding-step {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            padding: 8px 12px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.05);
+            transition: all 0.4s ease;
+        }
+
+        .seeding-step.active {
+            color: var(--text-primary);
+            border-color: rgba(6, 182, 212, 0.3);
+            background: rgba(6, 182, 212, 0.06);
+        }
+
+        .seeding-step.done {
+            color: var(--accent-green);
+            border-color: rgba(16, 185, 129, 0.3);
+            background: rgba(16, 185, 129, 0.06);
+        }
+
+        .seeding-step-icon {
+            font-size: 1rem;
+            width: 20px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
         .tab-indicator {
             display: flex;
             align-items: center;
@@ -882,6 +961,35 @@
                 <button class="btn-modal-skip" onclick="closeModal()">
                     Skip (review may be inaccurate)
                 </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- SEEDING PROGRESS MODAL -->
+    <div class="modal-overlay hidden" id="seeding-modal">
+        <div class="seeding-modal-box">
+            <span class="seeding-spinner">⚙️</span>
+            <div class="seeding-title">Injecting Baseline Rules...</div>
+            <div class="seeding-subtitle">
+                Distilling incidents into holographic glyphs and superposing them onto the substrate.
+            </div>
+            <div class="seeding-steps">
+                <div class="seeding-step" id="seed-step-1">
+                    <span class="seeding-step-icon">🔬</span>
+                    <span>Distilling Incident #402 — JSON.stringify CPU spike</span>
+                </div>
+                <div class="seeding-step" id="seed-step-2">
+                    <span class="seeding-step-icon">🔬</span>
+                    <span>Distilling Incident #112 — DB connection leak</span>
+                </div>
+                <div class="seeding-step" id="seed-step-3">
+                    <span class="seeding-step-icon">🔬</span>
+                    <span>Encoding CustomLogger.serialize() rule</span>
+                </div>
+                <div class="seeding-step" id="seed-step-4">
+                    <span class="seeding-step-icon">🧠</span>
+                    <span>Superposing glyphs onto holographic substrate</span>
+                </div>
             </div>
         </div>
     </div>
@@ -1201,19 +1309,44 @@
             btn.disabled = true;
             btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Seeding...';
 
+            // Show seeding progress modal
+            const seedingModal = document.getElementById('seeding-modal');
+            seedingModal.classList.remove('hidden');
+            const steps = ['seed-step-1', 'seed-step-2', 'seed-step-3', 'seed-step-4'];
+
+            // Animate steps progressively
+            const animateSteps = async () => {
+                for (let i = 0; i < steps.length; i++) {
+                    document.getElementById(steps[i]).classList.add('active');
+                    await delay(600);
+                }
+            };
+            const stepAnimation = animateSteps();
+
             try {
-                const response = await fetch('/seed-presets', {
-                    method: 'POST'
-                });
+                const response = await fetch('/seed-presets', { method: 'POST' });
+
+                // Wait for animation to finish (min visual time)
+                await stepAnimation;
 
                 if (response.ok) {
+                    // Mark all steps done
+                    steps.forEach(id => {
+                        const el = document.getElementById(id);
+                        el.classList.remove('active');
+                        el.classList.add('done');
+                        el.querySelector('.seeding-step-icon').textContent = '✅';
+                    });
                     memorySeeded = true;
-                    alert("Holographic memory successfully seeded with baseline incident guidelines!");
+                    await delay(800);
+                    seedingModal.classList.add('hidden');
                     await fetchStats();
                 } else {
+                    seedingModal.classList.add('hidden');
                     alert("Error seeding memory: " + response.statusText);
                 }
             } catch (err) {
+                seedingModal.classList.add('hidden');
                 alert("Connection error: " + err.message);
             } finally {
                 btn.disabled = false;
