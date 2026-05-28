@@ -88,7 +88,12 @@ async def simulate_review(request: SimulateReviewRequest):
         provide a firm technical rejection. Be extremely specific about which past incidents or rules are being violated and how.
         If it does not violate anything and is clean, approve it.
         
-        Format your response as a markdown comment suitable for GitLab.
+        IMPORTANT: You MUST start your response with exactly one of these two lines (nothing before it):
+        VERDICT: APPROVED
+        VERDICT: REJECTED
+        
+        Then continue with your full markdown review below that line.
+        Format the rest as a markdown comment suitable for GitLab.
         """
         
         response = ai.models.generate_content(
