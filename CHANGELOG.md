@@ -2,13 +2,13 @@
 
 All notable changes to GLIA are documented in this file.
 
-The next release is `0.4.0`. The `0.2.0a0` entry is retained as historical prerelease context.
+The next release is `0.4.1`. The `0.2.0a0` entry is retained as historical prerelease context.
 
-## [0.4.0] - Unreleased
+## [0.4.1] - Unreleased
 
 ### Changed
 
-- Promoted the public package metadata, runtime version, CLI version, and release documentation to the final `0.4.0` version.
+- Promoted the public package metadata, runtime version, CLI version, and release documentation to the final `0.4.1` version.
 - Prepared the distribution for a tag-only GitHub Actions release. The workflow validates the `v0.4.0` tag against `pyproject.toml`, builds source and wheel distributions, validates them with Twine, and publishes through PyPI Trusted Publishing.
 - Preserved SQLite schema version `3` and all durable-storage contracts: this is a package release, not a database migration.
 

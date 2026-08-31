@@ -1,6 +1,6 @@
 # GLIA — Arquitectura: Memoria Holográfica Distribuida
 
-> **Versión objetivo:** 0.4.0 (sin publicar)
+> **Versión objetivo:** 0.4.1 (sin publicar)
 > **Arquitectura:** Holographic Distributed Memory (HDM)
 > **Base teórica:** Vector Symbolic Architectures (VSA)
 

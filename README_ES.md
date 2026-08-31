@@ -2,7 +2,7 @@
 
 [Leer en inglés](README.md) | [Changelog](CHANGELOG.md)
 
-Próxima versión de release: `0.4.0` (sin publicar).
+Próxima versión de release: `0.4.1` (sin publicar).
 
 GLIA es un sistema de memoria persistente para agentes de IA basado en Memoria Holográfica Distribuida (HDM). Almacena conocimiento como patrones distribuidos de alta dimensión, lo recupera por resonancia y codifica relaciones como contribuciones holográficas reversibles. No es una base de datos de grafos, un índice BM25 ni un flujo RAG convencional.
 

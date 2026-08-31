@@ -2,7 +2,7 @@
 
 [Read in Spanish](README_ES.md) | [Changelog](CHANGELOG.md)
 
-Current release target: `0.4.0` (unreleased).
+Current release target: `0.4.1` (unreleased).
 
 GLIA is a persistent memory system for AI agents based on Holographic Distributed Memory (HDM). It stores knowledge as distributed high-dimensional patterns, retrieves it by resonance, and encodes relationships as reversible holographic contributions. It is not a graph database, a BM25 index, or a conventional RAG pipeline.
 

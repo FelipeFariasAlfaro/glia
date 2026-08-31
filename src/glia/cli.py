@@ -31,7 +31,7 @@ def _get_brain() -> GliaBrain:
 
 
 @click.group()
-@click.version_option(version="0.4.0", prog_name="glia")
+@click.version_option(version="0.4.1", prog_name="glia")
 def main():
     """GLIA - Holographic Distributed Memory for AI Agents."""
     pass
