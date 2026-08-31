@@ -1,3 +1,3 @@
 """GLIA - Holographic Distributed Memory for AI Agents."""
 
-__version__ = "0.2.0a0"
+__version__ = "0.4.0"
