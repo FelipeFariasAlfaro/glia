@@ -1,8 +1,10 @@
-# GLIA v0.1.0-alpha — Resumen de Benchmarks
+# Historical Benchmark Summary
 
-> **Modo testeado:** Local (sin embeddings, $0 costo, sin API key)
-> **Arquitectura:** Holographic Distributed Memory (HDM)
-> **Fecha:** Mayo 2026
+> **Release context:** The figures below are historical reference results and are not release-acceptance metrics for `0.2.0a0`.
+> **Current reproducible benchmark:** Run `benchmarks/benchmark_phase2.py`; its current results are summarized in the root README and CHANGELOG.
+> **Mode tested:** Local (no embeddings, no API key)
+> **Architecture:** Holographic Distributed Memory (HDM)
+> **Historical run date:** May 2026
 
 ---
 

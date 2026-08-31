@@ -31,9 +31,9 @@ def _get_brain() -> GliaBrain:
 
 
 @click.group()
-@click.version_option(version="0.1.0-alpha", prog_name="glia")
+@click.version_option(version="0.2.0a0", prog_name="glia")
 def main():
-    """GLIA - Associative Memory with Spreading Activation for AI Agents."""
+    """GLIA - Holographic Distributed Memory for AI Agents."""
     pass
 
 
@@ -153,14 +153,29 @@ def watch(path: str):
 @click.argument("query")
 @click.option("--top-k", "-k", default=10, help="Max nodes to activate")
 @click.option("--raw", is_flag=True, help="Show raw activation data")
-def recall(query: str, top_k: int, raw: bool):
+@click.option(
+    "--adapt",
+    is_flag=True,
+    help="Persist bounded Hebbian reinforcement for this recall",
+)
+@click.option(
+    "--explore",
+    is_flag=True,
+    help="Reserve result slots for holographic association discovery",
+)
+def recall(query: str, top_k: int, raw: bool, adapt: bool, explore: bool):
     """Recall associated knowledge via spreading activation."""
     brain = _get_brain()
     if not brain.is_initialized:
         click.echo("❌ GLIA not initialized. Run 'glia init' first.")
         sys.exit(1)
 
-    result = brain.recall(query, top_k=top_k)
+    result = brain.recall(
+        query,
+        top_k=top_k,
+        adapt=adapt,
+        explore=explore,
+    )
 
     activated = result["activated_nodes"]
     if not activated:
@@ -203,6 +218,38 @@ def stats():
     click.echo(f"   Edges (connections):   {s['edges']}")
     click.echo(f"   Avg connections/node:  {s['avg_connections']:.1f}")
     click.echo(f"   Threads (memories):    {s['threads']}")
+
+
+@main.command()
+@click.option("--deep", is_flag=True, help="Run SQLite integrity_check instead of quick_check")
+def doctor(deep: bool):
+    """Validate SQLite and holographic substrate consistency."""
+    brain = _get_brain()
+    if not brain.is_initialized:
+        click.echo("❌ GLIA not initialized. Run 'glia init' first.")
+        sys.exit(1)
+    try:
+        health = brain.health(deep=deep)
+    except Exception as error:
+        click.echo(f"❌ GLIA integrity check failed: {error}")
+        sys.exit(1)
+    click.echo(f"✅ Storage status: {health['status']}")
+    click.echo(f"   Check: {health['check']}")
+    click.echo(f"   Revision: {health['revision']}")
+    click.echo(f"   Database: {health['database_bytes']} bytes")
+    click.echo(f"   WAL: {health['wal_bytes']} bytes")
+
+
+@main.command()
+@click.argument("destination", required=False, type=click.Path(path_type=Path))
+def backup(destination: Path | None):
+    """Create a transactionally consistent SQLite backup."""
+    brain = _get_brain()
+    if not brain.is_initialized:
+        click.echo("❌ GLIA not initialized. Run 'glia init' first.")
+        sys.exit(1)
+    backup_path = brain.backup(destination)
+    click.echo(f"✅ Backup created: {backup_path}")
 
 
 @main.command()

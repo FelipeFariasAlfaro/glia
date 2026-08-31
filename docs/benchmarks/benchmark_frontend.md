@@ -1,6 +1,6 @@
 # Benchmark: TypeScript/React Frontend
 
-> **Proyecto:** `benchmark_project_3` | **GLIA:** 0.1.0-alpha | **Modo:** Local ($0)
+> **Proyecto:** `benchmark_project_3` | **Resultado:** Referencia histórica local | **Release actual:** `0.2.0a0` | **Modo:** Local ($0)
 
 ---
 

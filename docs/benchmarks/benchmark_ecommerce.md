@@ -1,6 +1,6 @@
 # Benchmark: E-Commerce Microservice
 
-> **Proyecto:** `benchmark_project` | **GLIA:** 0.1.0-alpha | **Modo:** Local ($0)
+> **Proyecto:** `benchmark_project` | **Resultado:** Referencia histórica local | **Release actual:** `0.2.0a0` | **Modo:** Local ($0)
 
 ---
 

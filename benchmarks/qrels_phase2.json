@@ -1,0 +1,114 @@
+{
+  "benchmark_project_2": {
+    "What happens if a new feature is added to training but not to the drift detector?": [
+      "src/config/model_config.py",
+      "src/models/training.py",
+      "src/monitoring/drift_detector.py"
+    ],
+    "Why did the 2024-06 model degradation go undetected by the validation pipeline?": [
+      "docs/incidents/2024-06-model-degradation.md",
+      "src/data/validation.py",
+      "src/utils/data_contracts.py"
+    ],
+    "How are the 2024-02 feature leak and 2024-06 model degradation incidents connected?": [
+      "docs/incidents/2024-02-feature-leak.md",
+      "docs/incidents/2024-06-model-degradation.md",
+      "src/data/feature_engineering.py"
+    ],
+    "What could go wrong if the retraining pipeline runs within 4 hours of the daily pipeline?": [
+      "src/config/infra_config.py",
+      "src/pipelines/daily_pipeline.py",
+      "src/pipelines/retraining_pipeline.py",
+      "src/utils/feature_store.py"
+    ],
+    "What happens if S3 clickstream data arrives after 6:00 AM UTC?": [
+      "src/config/infra_config.py",
+      "src/data/ingestion.py",
+      "src/pipelines/daily_pipeline.py"
+    ],
+    "Why can't a model with excellent AUC be automatically promoted to production?": [
+      "src/models/evaluation.py",
+      "src/models/registry.py",
+      "src/pipelines/retraining_pipeline.py"
+    ],
+    "What must be done after every model promotion or rollback regarding alerts?": [
+      "src/models/registry.py",
+      "src/monitoring/alerts.py"
+    ],
+    "What is the relationship between GPU memory and training batch size?": [
+      "src/config/infra_config.py",
+      "src/models/training.py"
+    ],
+    "How does the feature store cache TTL create a coupling between the daily pipeline and retraining?": [
+      "src/config/infra_config.py",
+      "src/pipelines/daily_pipeline.py",
+      "src/pipelines/retraining_pipeline.py",
+      "src/utils/feature_store.py"
+    ],
+    "Why was auto-promotion disabled after the 2024-02 incident?": [
+      "docs/incidents/2024-02-feature-leak.md",
+      "src/pipelines/retraining_pipeline.py"
+    ],
+    "What is the full chain of events from a PostgreSQL schema change to model degradation?": [
+      "docs/incidents/2024-06-model-degradation.md",
+      "src/data/feature_engineering.py",
+      "src/data/ingestion.py",
+      "src/data/validation.py",
+      "src/utils/data_contracts.py"
+    ],
+    "What happens if you change the serving instance from CPU to GPU without updating the model config?": [
+      "src/config/infra_config.py",
+      "src/config/model_config.py",
+      "src/models/serving.py"
+    ],
+    "How does the drift detector's dependency on model_config create a maintenance burden?": [
+      "src/config/model_config.py",
+      "src/monitoring/drift_detector.py"
+    ],
+    "What is the complete rollback procedure and why is each step necessary?": [
+      "docs/runbook.md",
+      "src/models/registry.py",
+      "src/models/serving.py",
+      "src/monitoring/alerts.py"
+    ],
+    "Why might the model perform well in offline evaluation but poorly in production after the feature leak fix?": [
+      "docs/incidents/2024-02-feature-leak.md",
+      "src/models/serving.py",
+      "src/models/training.py",
+      "src/utils/feature_store.py"
+    ],
+    "What is the relationship between the S3 data deadline, daily pipeline schedule, and feature freshness?": [
+      "src/config/infra_config.py",
+      "src/data/feature_engineering.py",
+      "src/data/ingestion.py",
+      "src/pipelines/daily_pipeline.py",
+      "src/utils/feature_store.py"
+    ],
+    "How do data contracts prevent the type of issue that caused the 2024-06 incident?": [
+      "docs/incidents/2024-06-model-degradation.md",
+      "src/data/validation.py",
+      "src/utils/data_contracts.py"
+    ],
+    "What happens if alert thresholds are not recalibrated after a model with higher prediction scores is promoted?": [
+      "src/models/registry.py",
+      "src/monitoring/alerts.py"
+    ],
+    "Why was XGBoost chosen over deep learning and how does this affect infrastructure coupling?": [
+      "docs/decisions/adr-001-xgboost-over-neural.md",
+      "src/config/infra_config.py",
+      "src/models/serving.py",
+      "src/models/training.py"
+    ],
+    "How could adding a feature to model_config.py without updating data_contracts.py cause issues?": [
+      "src/config/model_config.py",
+      "src/data/feature_engineering.py",
+      "src/data/validation.py",
+      "src/utils/data_contracts.py"
+    ],
+    "What is the full impact chain if someone upgrades the GPU instance type without updating infra_config.py?": [
+      "docs/decisions/adr-001-xgboost-over-neural.md",
+      "src/config/infra_config.py",
+      "src/models/training.py"
+    ]
+  }
+}

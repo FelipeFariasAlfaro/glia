@@ -6,6 +6,8 @@ Supports: Python, JS/TS, Java, Go, Rust, C#, C/C++, Ruby, PHP, Kotlin, Swift, Gh
 from __future__ import annotations
 
 import ast
+import copy
+import hashlib
 import re
 from pathlib import Path
 
@@ -23,10 +25,9 @@ class ASTScannerV2:
         self.embedder = embedder
     def scan_file(self, filepath: Path, substrate: Substrate, relative_path: str = "") -> dict:
         source = relative_path or filepath.name
-        try:
-            content = filepath.read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            return {"glyphs": 0, "relationships": 0}
+        raw_content = filepath.read_bytes()
+        content = raw_content.decode("utf-8", errors="ignore")
+        content_hash = hashlib.sha256(raw_content).hexdigest()
 
         ext = filepath.suffix.lower()
         scanners = {
@@ -38,23 +39,73 @@ class ASTScannerV2:
             ".swift": self._scan_swift, ".feature": self._scan_gherkin,
             ".md": self._scan_markdown, ".txt": self._scan_markdown,
         }
-        return scanners.get(ext, self._scan_generic)(content, substrate, source)
+        scanner = scanners.get(ext, self._scan_generic)
+        tracking_checkpoint = substrate.tracking_checkpoint()
+        previous_region_ids = set(substrate.regions)
+        previous_glyphs = {
+            glyph_id: copy.deepcopy(glyph)
+            for glyph_id, glyph in substrate.glyphs.items()
+            if glyph.source == source
+        }
+        previous_relationships = {
+            relationship_id: copy.deepcopy(relationship)
+            for relationship_id, relationship in substrate.relationships.items()
+            if relationship.source == source
+        }
+        affected_regions = {"default"}
+        affected_regions.update(glyph.region_id for glyph in previous_glyphs.values())
+        affected_regions.update(
+            relationship.region_id for relationship in previous_relationships.values()
+        )
+        previous_regions = {
+            region_id: copy.deepcopy(substrate.regions.get(region_id))
+            for region_id in affected_regions
+        }
+        try:
+            substrate.remove_source(source)
+            stats = scanner(content, substrate, source)
+            stats["hash"] = content_hash
+            return stats
+        except Exception:
+            substrate.remove_source(source)
+            for region_id in set(substrate.regions) - previous_region_ids:
+                substrate.regions.pop(region_id, None)
+            for region_id, region in previous_regions.items():
+                if region is None:
+                    substrate.regions.pop(region_id, None)
+                else:
+                    substrate.regions[region_id] = region
+            substrate.glyphs.update(previous_glyphs)
+            substrate.relationships.update(previous_relationships)
+            substrate.restore_tracking(tracking_checkpoint)
+            raise
+
+    @staticmethod
+    def _source_namespace(source: str) -> str:
+        normalized = source.replace("\\", "/").strip("/")
+        stem = re.sub(r"[^a-zA-Z0-9]+", "_", Path(normalized).stem).strip("_") or "file"
+        digest = hashlib.sha256(normalized.encode("utf-8")).hexdigest()[:10]
+        return f"{stem}_{digest}"
 
     def _store(self, substrate, name, content, source, context=""):
-        """Store a glyph. Uses embeddings if available, otherwise local encoding."""
-        encode_input = f"{name} {content} {Path(source).stem}"
+        """Store a source-qualified glyph using enhanced or local encoding."""
+        encode_input = f"{name} {content} {source}"
 
-        # Try enhanced embeddings first
         vector = None
         if self.embedder and self.embedder.is_available:
             vector = self.embedder.embed(encode_input)
-
-        # Fallback to local encoding (free)
         if vector is None:
             vector = encode_text(encode_input)
 
-        glyph_id = f"{context}_{name}" if context else name
-        substrate.store_glyph(glyph_id=glyph_id, vector=vector, content=content[:200], source=source)
+        namespace = self._source_namespace(source)
+        local_id = f"{context}:{name}" if context else name
+        glyph_id = f"{namespace}:{local_id}"
+        substrate.store_glyph(
+            glyph_id=glyph_id,
+            vector=vector,
+            content=content[:200],
+            source=source,
+        )
 
     def _extract_comments(self, content: str) -> list[str]:
         """Extract all comments from source code."""
@@ -67,9 +118,15 @@ class ASTScannerV2:
                     comments.append(comment)
         return comments
 
-    def _relate(self, substrate, src, tgt, rel_type):
+    def _relate(self, substrate, src, tgt, rel_type, source):
         rel_vector = encode_relationship(src, tgt, rel_type)
-        substrate.store_relationship(rel_vector)
+        identity = "|".join((source.replace("\\", "/"), src, tgt, rel_type))
+        relationship_id = f"scan:{hashlib.sha256(identity.encode('utf-8')).hexdigest()[:24]}"
+        substrate.store_relationship(
+            rel_vector,
+            relationship_id=relationship_id,
+            source=source,
+        )
 
     def _scan_python(self, content, substrate, source):
         stats = {"glyphs": 0, "relationships": 0}
@@ -92,10 +149,10 @@ class ASTScannerV2:
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
-                    self._relate(substrate, module, alias.name.split(".")[0], "imports")
+                    self._relate(substrate, module, alias.name.split(".")[0], "imports", source)
                     stats["relationships"] += 1
             elif isinstance(node, ast.ImportFrom) and node.module:
-                self._relate(substrate, module, node.module.split(".")[0], "imports")
+                self._relate(substrate, module, node.module.split(".")[0], "imports", source)
                 stats["relationships"] += 1
 
         # Functions and classes with FULL docstrings
@@ -135,20 +192,62 @@ class ASTScannerV2:
     def _scan_js(self, content, substrate, source):
         stats = {"glyphs": 0, "relationships": 0}
         module = Path(source).stem
-        self._store(substrate, module, f"Module {source}", source, "module")
+        module_summary = re.sub(r"\s+", " ", content[:500]).strip()
+        self._store(
+            substrate,
+            module,
+            module_summary or f"Module {source}",
+            source,
+            "module",
+        )
         stats["glyphs"] += 1
-        for match in re.finditer(r'(?:export\s+)?(?:async\s+)?function\s+(\w+)', content):
-            self._store(substrate, match.group(1), f"Function '{match.group(1)}' in {source}", source, module)
-            stats["glyphs"] += 1
-        for match in re.finditer(r'(?:export\s+)?(?:const|let|var)\s+(\w+)\s*=\s*(?:async\s*)?\(', content):
-            self._store(substrate, match.group(1), f"Function '{match.group(1)}' in {source}", source, module)
-            stats["glyphs"] += 1
-        for match in re.finditer(r'(?:export\s+)?class\s+(\w+)', content):
-            self._store(substrate, match.group(1), f"Class '{match.group(1)}' in {source}", source, module)
-            stats["glyphs"] += 1
-        for match in re.finditer(r'(?:import|require)\s*\(?["\']([^"\']+)["\']', content):
-            self._relate(substrate, module, Path(match.group(1)).stem.replace("-", "_"), "imports")
+
+        declarations = [
+            re.compile(r"(?:export\s+)?(?:default\s+)?(?:async\s+)?function\s+(\w+)"),
+            re.compile(
+                r"(?:export\s+)?(?:const|let|var)\s+(\w+)"
+                r"(?:\s*:\s*[^=]+)?\s*=\s*(?:async\s*)?"
+                r"(?:\([^)]*\)|\w+)\s*=>"
+            ),
+            re.compile(r"(?:export\s+)?class\s+(\w+)"),
+            re.compile(r"(?:export\s+)?(?:interface|type|enum)\s+(\w+)"),
+        ]
+        seen = set()
+        for pattern in declarations:
+            for match in pattern.finditer(content):
+                name = match.group(1)
+                if name in seen:
+                    continue
+                seen.add(name)
+                start = max(0, match.start() - 120)
+                snippet = re.sub(
+                    r"\s+", " ", content[start:match.start() + 360]
+                ).strip()
+                self._store(substrate, name, snippet, source, module)
+                stats["glyphs"] += 1
+
+        for match in re.finditer(
+            r"(?:import\s+.*?\s+from\s+|require\s*\()[\"']([^\"']+)[\"']",
+            content,
+        ):
+            self._relate(
+                substrate,
+                module,
+                Path(match.group(1)).stem.replace("-", "_"),
+                "imports",
+                source,
+            )
             stats["relationships"] += 1
+
+        for index, comment in enumerate(self._extract_comments(content)[:8]):
+            self._store(
+                substrate,
+                f"note_{index}",
+                comment,
+                source,
+                module,
+            )
+            stats["glyphs"] += 1
         return stats
 
     def _scan_java(self, content, substrate, source):

@@ -1,16 +1,4 @@
-"""
-GLIA Resonance Engine - Retrieval by pattern projection + holographic unbinding.
-
-Multi-hop works by:
-1. Initial resonance (find directly matching patterns)
-2. Holographic unbinding (discover implicit associations from substrate)
-3. Iterative expansion (use discovered associations as new stimuli)
-4. Word-overlap fallback (catch remaining matches)
-
-This is what RAG CANNOT do: discover relationships that were encoded
-holographically in the substrate via binding, even when the concepts
-don't share any vocabulary.
-"""
+"""Pattern projection and bounded holographic unbinding for GLIA."""
 
 from __future__ import annotations
 
@@ -18,25 +6,76 @@ import re
 
 import numpy as np
 
-from .binding import cosine_similarity, normalize, unbind, bind, DIMENSION
-from .substrate import Substrate, GlyphMeta
+from .binding import normalize, unbind
 from .encoder import encode_text
+from .substrate import GlyphMeta, ResonanceSnapshot, Substrate
 
 MIN_RESONANCE = 0.05
 
 
-def resonate(stimulus: np.ndarray, glyphs: list[GlyphMeta], top_k: int = 10) -> list[tuple[GlyphMeta, float]]:
-    """Project stimulus and find resonating patterns (parallel)."""
-    scores = []
-    for glyph in glyphs:
-        if glyph.magnitude <= 0:
-            continue
-        sim = cosine_similarity(stimulus, glyph.vector)
-        score = sim * glyph.magnitude
-        if score > MIN_RESONANCE:
-            scores.append((glyph, score))
-    scores.sort(key=lambda x: x[1], reverse=True)
-    return scores[:top_k]
+class _ResonanceIndex:
+    """Vectorized view of active glyphs, optionally backed by a cached snapshot."""
+
+    def __init__(
+        self,
+        glyphs: list[GlyphMeta] | None = None,
+        snapshot: ResonanceSnapshot | None = None,
+    ):
+        if snapshot is not None:
+            self.glyphs = snapshot.glyphs
+            self.vectors = snapshot.vectors
+            self.scales = snapshot.scales
+            return
+
+        active = tuple(glyph for glyph in (glyphs or []) if glyph.magnitude > 0)
+        self.glyphs = active
+        if not active:
+            self.vectors = np.empty((0, 0), dtype=np.float64)
+            self.scales = np.empty(0, dtype=np.float64)
+            return
+        self.vectors = np.stack([glyph.vector for glyph in active])
+        norms = np.linalg.norm(self.vectors, axis=1)
+        magnitudes = np.asarray(
+            [glyph.magnitude for glyph in active], dtype=np.float64
+        )
+        self.scales = np.divide(
+            magnitudes,
+            norms,
+            out=np.zeros_like(magnitudes),
+            where=norms > 1e-12,
+        )
+
+    @classmethod
+    def from_substrate(cls, substrate: Substrate) -> "_ResonanceIndex":
+        return cls(snapshot=substrate.resonance_snapshot())
+
+    def query(
+        self,
+        stimulus: np.ndarray,
+        top_k: int,
+        minimum: float = MIN_RESONANCE,
+    ) -> list[tuple[GlyphMeta, float]]:
+        if not self.glyphs or top_k <= 0:
+            return []
+        stimulus = np.asarray(stimulus, dtype=np.float64)
+        stimulus_norm = float(np.linalg.norm(stimulus))
+        if stimulus_norm <= 1e-12:
+            return []
+        scores = (self.vectors @ stimulus) * self.scales / stimulus_norm
+        candidates = np.flatnonzero(scores > minimum)
+        if not candidates.size:
+            return []
+        ordered = candidates[np.argsort(scores[candidates])[::-1]][:top_k]
+        return [(self.glyphs[index], float(scores[index])) for index in ordered]
+
+
+def resonate(
+    stimulus: np.ndarray,
+    glyphs: list[GlyphMeta],
+    top_k: int = 10,
+) -> list[tuple[GlyphMeta, float]]:
+    """Project a stimulus against active glyphs using vectorized cosine scoring."""
+    return _ResonanceIndex(glyphs=glyphs).query(stimulus, top_k=top_k)
 
 
 def resonate_multihop(
@@ -45,68 +84,101 @@ def resonate_multihop(
     substrate: Substrate | None = None,
     hops: int = 3,
     top_k: int = 10,
+    _index: _ResonanceIndex | None = None,
 ) -> list[tuple[GlyphMeta, float]]:
+    """Retrieve direct matches and add bounded unbinding evidence.
+
+    Direct resonance is computed once and remains the ranking anchor. Each
+    additional hop may add a small association bonus, but never repeatedly
+    re-adds the same direct score. This prevents the query drift present in the
+    earlier iterative-superposition implementation.
     """
-    Multi-hop resonance with holographic unbinding.
+    if hops < 1 or top_k < 1:
+        return []
 
-    Hop 1: Direct resonance (like RAG)
-    Hop 2: Unbind top results from substrate to discover implicit associations
-    Hop 3: Use discovered associations as new stimuli
+    if _index is not None:
+        index = _index
+    elif substrate is not None and len(glyphs) == len(substrate.glyphs) and all(
+        substrate.glyphs.get(glyph.id) is glyph for glyph in glyphs
+    ):
+        index = _ResonanceIndex.from_substrate(substrate)
+    else:
+        index = _ResonanceIndex(glyphs=glyphs)
+    direct = index.query(stimulus, top_k=max(top_k * 3, 15))
+    if not direct:
+        return []
 
-    The unbinding step is what makes this fundamentally different from RAG.
-    It discovers relationships that were encoded holographically — even when
-    the concepts don't share vocabulary.
-    """
-    all_results: dict[str, tuple[GlyphMeta, float]] = {}
-    current_stimulus = stimulus
+    scores: dict[str, tuple[GlyphMeta, float]] = {
+        glyph.id: (glyph, score) for glyph, score in direct
+    }
+    frontier = direct[:3]
 
-    for hop in range(hops):
-        # Standard resonance pass
-        results = resonate(current_stimulus, glyphs, top_k=top_k)
-        decay = 0.7 ** hop  # Less aggressive decay for more hops
-        for glyph, score in results:
-            existing_score = all_results.get(glyph.id, (None, 0.0))[1]
-            new_score = existing_score + score * decay
-            all_results[glyph.id] = (glyph, new_score)
+    if substrate is not None:
+        for hop in range(1, hops):
+            strength = 0.18 * (0.5 ** (hop - 1))
+            discovered: dict[str, tuple[GlyphMeta, float]] = {}
+            for glyph, _ in frontier:
+                region = substrate.regions.get(glyph.region_id)
+                if region is None:
+                    continue
+                associated = normalize(unbind(region.vector, glyph.vector))
+                for candidate, association_score in index.query(associated, top_k=5):
+                    if candidate.id == glyph.id:
+                        continue
+                    bonus = association_score * strength
+                    current = scores.get(candidate.id)
+                    if current is None:
+                        scores[candidate.id] = (candidate, bonus)
+                    else:
+                        bounded_bonus = min(bonus, max(current[1] * 0.10, 0.01))
+                        scores[candidate.id] = (candidate, current[1] + bounded_bonus)
+                    previous = discovered.get(candidate.id)
+                    if previous is None or bonus > previous[1]:
+                        discovered[candidate.id] = (candidate, bonus)
+            frontier = sorted(
+                discovered.values(), key=lambda item: item[1], reverse=True
+            )[:3]
+            if not frontier:
+                break
 
-        if not results:
-            break
-
-        # --- HOLOGRAPHIC UNBINDING (the multi-hop secret) ---
-        # Try to discover implicit associations by unbinding top results
-        # from the substrate region vector
-        if substrate and hop < hops - 1:
-            region = substrate.get_or_create_region("default")
-            for glyph, _ in results[:3]:
-                # Unbind this glyph from the substrate to see what's associated
-                # If bind(A, B) was stored in substrate, unbind(substrate, A) ≈ B
-                associated = unbind(region.vector, glyph.vector)
-                associated_normalized = normalize(associated)
-
-                # Find what this "ghost" vector resonates with
-                ghost_results = resonate(associated_normalized, glyphs, top_k=5)
-                for ghost_glyph, ghost_score in ghost_results:
-                    if ghost_glyph.id != glyph.id:
-                        # Discovered association! Add with reduced weight
-                        existing = all_results.get(ghost_glyph.id, (None, 0.0))[1]
-                        bonus = ghost_score * 0.3 * decay
-                        all_results[ghost_glyph.id] = (ghost_glyph, existing + bonus)
-
-        # Build next stimulus from top results (superposition)
-        top_vectors = [g.vector for g, _ in results[:5]]
-        if top_vectors:
-            current_stimulus = normalize(np.sum(top_vectors, axis=0))
-
-    final = sorted(all_results.values(), key=lambda x: x[1], reverse=True)
-    return final[:top_k]
+    return sorted(scores.values(), key=lambda item: item[1], reverse=True)[:top_k]
 
 
-def resonate_conjunctive(stimuli: list[np.ndarray], glyphs: list[GlyphMeta], top_k: int = 10) -> list[tuple[GlyphMeta, float]]:
-    """Find patterns related to ALL stimuli simultaneously."""
+def resonate_conjunctive(
+    stimuli: list[np.ndarray],
+    glyphs: list[GlyphMeta],
+    top_k: int = 10,
+) -> list[tuple[GlyphMeta, float]]:
+    """Find patterns related to all stimuli simultaneously."""
     if not stimuli:
         return []
-    combined = normalize(np.sum(stimuli, axis=0))
-    return resonate(combined, glyphs, top_k=top_k)
+    return resonate(normalize(np.sum(stimuli, axis=0)), glyphs, top_k=top_k)
+
+
+def _words(text: str) -> set[str]:
+    return {
+        word
+        for word in re.split(r"[^a-z0-9]+", text.lower())
+        if len(word) >= 2
+    }
+
+
+def _diverse_results(
+    results: list[tuple[GlyphMeta, float]],
+    top_k: int,
+) -> list[tuple[GlyphMeta, float]]:
+    """Prefer distinct sources while retaining source-less manual memories."""
+    diverse: list[tuple[GlyphMeta, float]] = []
+    seen: set[str] = set()
+    for glyph, score in results:
+        key = glyph.source or glyph.id
+        if key in seen:
+            continue
+        seen.add(key)
+        diverse.append((glyph, score))
+        if len(diverse) >= top_k:
+            break
+    return diverse
 
 
 def resolve_query(
@@ -115,51 +187,70 @@ def resolve_query(
     top_k: int = 10,
     hops: int = 3,
     embedder=None,
+    explore: bool = False,
 ) -> list[tuple[GlyphMeta, float]]:
-    """Full pipeline: text → encode → resonate (with unbinding) → results."""
-    glyphs = substrate.get_all_glyphs()
-    if not glyphs:
+    """Resolve text through stable HDM retrieval or explicit exploration."""
+    if not substrate.glyphs or top_k < 1:
         return []
 
-    # Try enhanced embedding for query
     stimulus = None
     if embedder and embedder.is_available:
         stimulus = embedder.embed(query)
-
-    # Fallback to local encoding
     if stimulus is None:
         stimulus = encode_text(query)
 
-    # Multi-hop resonance WITH holographic unbinding
-    results = resonate_multihop(
-        stimulus, glyphs, substrate=substrate, hops=hops, top_k=top_k
+    index = _ResonanceIndex.from_substrate(substrate)
+    glyphs = list(index.glyphs)
+    candidate_count = max(top_k * 4, 20)
+    direct = index.query(stimulus, top_k=candidate_count)
+    direct_diverse = _diverse_results(direct, top_k)
+    if len(direct_diverse) >= top_k and not explore:
+        return direct_diverse
+    holographic = (
+        resonate_multihop(
+            stimulus,
+            glyphs,
+            substrate=substrate,
+            hops=hops,
+            top_k=candidate_count,
+            _index=index,
+        )
+        if explore
+        else []
     )
 
-    # Word-overlap fallback for remaining matches
-    query_words = set(re.split(r'[^a-z0-9]+', query.lower()))
-    query_words = {w for w in query_words if len(w) >= 2}
+    lexical: list[tuple[GlyphMeta, float]] = []
+    query_words = _words(query)
+    if query_words:
+        for glyph in glyphs:
+            glyph_words = _words(f"{glyph.id} {glyph.content} {glyph.source}")
+            overlap = len(query_words & glyph_words)
+            if overlap:
+                lexical.append(
+                    (glyph, overlap / len(query_words) * min(glyph.magnitude, 2.0))
+                )
+        lexical.sort(key=lambda item: item[1], reverse=True)
 
-    existing_ids = {g.id for g, _ in results}
-    word_matches = []
+    if explore:
+        keep = max(1, int(top_k * 0.8))
+        combined = list(direct_diverse[:keep])
+        direct_ids = {glyph.id for glyph, _ in direct}
+        novel_associations = [
+            item for item in holographic if item[0].id not in direct_ids
+        ]
+        candidate_groups = (novel_associations, holographic, lexical, direct)
+    else:
+        combined = list(direct_diverse)
+        candidate_groups = (holographic, lexical, direct)
 
-    for glyph in glyphs:
-        if glyph.id in existing_ids:
-            continue
-        glyph_text = f"{glyph.id} {glyph.content}".lower()
-        glyph_words = set(re.split(r'[^a-z0-9]+', glyph_text))
-
-        overlap = len(query_words & glyph_words)
-        if overlap > 0:
-            score = (overlap / max(len(query_words), 1)) * 0.3 * glyph.magnitude
-            word_matches.append((glyph, score))
-
-    word_matches.sort(key=lambda x: x[1], reverse=True)
-
-    combined = list(results)
-    for glyph, score in word_matches[:top_k]:
-        if glyph.id not in existing_ids:
+    seen = {glyph.source or glyph.id for glyph, _ in combined}
+    for candidates in candidate_groups:
+        for glyph, score in candidates:
+            key = glyph.source or glyph.id
+            if key in seen:
+                continue
             combined.append((glyph, score))
-            existing_ids.add(glyph.id)
-
-    combined.sort(key=lambda x: x[1], reverse=True)
-    return combined[:top_k]
+            seen.add(key)
+            if len(combined) >= top_k:
+                return combined
+    return combined

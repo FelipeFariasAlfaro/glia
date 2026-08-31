@@ -1,11 +1,9 @@
-"""
-GLIA Distiller v2 - Converts raw information into glyphs for the substrate.
-"""
+"""Convert raw information into deterministic holographic contributions."""
 
 from __future__ import annotations
 
-import json
 import hashlib
+import json
 from typing import Optional
 
 try:
@@ -13,8 +11,8 @@ try:
 except ImportError:
     genai = None
 
+from .encoder import encode_relationship, encode_text
 from .substrate import Substrate
-from .encoder import encode_text, encode_relationship
 
 DISTILL_PROMPT = """You are GLIA, a neural memory indexer. Analyze the following content and extract semantic units.
 
@@ -45,7 +43,11 @@ Respond ONLY with valid JSON:
 
 
 class Distiller:
-    def __init__(self, api_key: Optional[str] = None, model: str = "gemini-3.1-flash-lite-preview"):
+    def __init__(
+        self,
+        api_key: Optional[str] = None,
+        model: str = "gemini-3.1-flash-lite-preview",
+    ):
         self.model_name = model
         self.api_key = api_key
         self._client = None
@@ -57,36 +59,73 @@ class Distiller:
             self._client = genai.Client(api_key=self.api_key)
         return self._client
 
-    def distill(self, content: str, substrate: Substrate, source: str = "") -> dict:
+    def extract(self, content: str, substrate: Substrate, source: str = "") -> dict:
+        """Call the external model once and return validated, unapplied units."""
         known = list(substrate.glyphs.keys())[:150]
-        known_str = ", ".join(known) if known else "(empty)"
+        prompt = DISTILL_PROMPT.format(
+            known_nodes=", ".join(known) if known else "(empty)",
+            content=content[:6000],
+            source=source or "unknown",
+        )
+        response = self._get_client().models.generate_content(
+            model=self.model_name,
+            contents=prompt,
+        )
+        return self._parse_response(response.text)
 
-        prompt = DISTILL_PROMPT.format(known_nodes=known_str, content=content[:6000], source=source or "unknown")
-        client = self._get_client()
-        response = client.models.generate_content(model=self.model_name, contents=prompt)
-        result = self._parse_response(response.text)
-
+    def apply(self, result: dict, substrate: Substrate, source: str = "") -> dict:
+        """Deterministically apply previously extracted units to a substrate."""
         concepts = []
         relationships = []
-
         for unit in result.get("units", []):
             concept = unit.get("concept", "")
             intention = unit.get("intention", "")
             if not concept:
                 continue
-
-            vector = encode_text(f"{concept} {intention}")
-            substrate.store_glyph(glyph_id=concept, vector=vector, content=intention, source=source)
+            substrate.store_glyph(
+                glyph_id=concept,
+                vector=encode_text(f"{concept} {intention}"),
+                content=intention,
+                source=source,
+            )
             concepts.append(concept)
 
-            for rel in unit.get("relationships", []):
-                target = rel.get("target", "")
-                if target:
-                    rel_vector = encode_relationship(concept, target, "related")
-                    substrate.store_relationship(rel_vector)
-                    relationships.append({"source": concept, "target": target, "weight": rel.get("weight", 0.5)})
+            for relationship in unit.get("relationships", []):
+                target = relationship.get("target", "")
+                if not target:
+                    continue
+                identity = "|".join((source, concept, target, "related"))
+                relationship_id = (
+                    "distill:"
+                    + hashlib.sha256(identity.encode("utf-8")).hexdigest()[:24]
+                )
+                substrate.store_relationship(
+                    encode_relationship(concept, target, "related"),
+                    relationship_id=relationship_id,
+                    source=source,
+                )
+                relationships.append(
+                    {
+                        "source": concept,
+                        "target": target,
+                        "weight": relationship.get("weight", 0.5),
+                    }
+                )
 
-        return {"concepts": concepts, "relationships": relationships, "summary": f"Extracted {len(concepts)} glyphs from {source}", "units": result.get("units", [])}
+        return {
+            "concepts": concepts,
+            "relationships": relationships,
+            "summary": f"Extracted {len(concepts)} glyphs from {source}",
+            "units": result.get("units", []),
+        }
+
+    def distill(self, content: str, substrate: Substrate, source: str = "") -> dict:
+        """Backward-compatible one-shot extraction and application."""
+        return self.apply(
+            self.extract(content, substrate, source),
+            substrate,
+            source,
+        )
 
     def _parse_response(self, text: str) -> dict:
         cleaned = text.strip()

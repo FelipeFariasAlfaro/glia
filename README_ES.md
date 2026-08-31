@@ -1,728 +1,176 @@
-# 🧠 GLIA - Memoria Holográfica Distribuida para Agentes de IA
+# GLIA: Memoria Holográfica Distribuida para Agentes de IA
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
-[![MCP Compatible](https://img.shields.io/badge/MCP-compatible-green.svg)](https://modelcontextprotocol.io/)
-[![Version](https://img.shields.io/badge/version-0.1.0--alpha-orange.svg)]()
+[Leer en inglés](README.md) | [Changelog](CHANGELOG.md)
 
-**GLIA** es un sistema de memoria persistente para agentes de IA basado en **Memoria Holográfica Distribuida (HDM)**. No es un grafo. No es RAG. Es una arquitectura genuinamente distinta donde el conocimiento se almacena como patrones distribuidos en un espacio vectorial de alta dimensión, y la recuperación funciona por **resonancia** — proyección paralela de patrones, no búsqueda de texto ni traversal de nodos.
+Prerelease actual: `0.2.0a0`.
 
----
+GLIA es un sistema de memoria persistente para agentes de IA basado en Memoria Holográfica Distribuida (HDM). Almacena conocimiento como patrones distribuidos de alta dimensión, lo recupera por resonancia y codifica relaciones como contribuciones holográficas reversibles. No es una base de datos de grafos, un índice BM25 ni un flujo RAG convencional.
 
-## ¿Qué problema resuelve?
+GLIA está pensado para agentes que necesitan contexto durable del proyecto: decisiones de arquitectura, estructura de código, procedencia de fuentes, conocimiento operativo y adaptación acotada de la memoria entre sesiones.
 
-Los agentes de IA (Cline, Claude, Cursor, Copilot, etc) pierden contexto entre sesiones. Cada chat nuevo empieza de cero — sin memoria de bugs pasados, decisiones arquitectónicas, ni cómo se relacionan las partes del proyecto.
+## Qué hace GLIA
 
-GLIA resuelve esto manteniendo una **memoria relacional persistente** que crece con cada interacción y se fortalece con el uso.
+- Codifica texto y código de forma determinista en vectores de 1024 dimensiones, sin requerir una clave de API.
+- Almacena glyphs en regiones de memoria superpuestas y los puntúa mediante resonancia vectorial paralela.
+- Codifica asociaciones con binding circular y contribuciones de relación explícitas y reversibles, no con aristas de un grafo.
+- Escanea archivos compatibles de forma incremental, rastrea hashes por fuente y elimina contribuciones de archivos borrados o ignorados.
+- Ofrece recall estable y de solo lectura por defecto; `adapt` persiste refuerzo hebbiano acotado y `explore` reserva resultados para asociaciones holográficas.
+- Persiste memoria por proyecto en SQLite con WAL, durabilidad síncrona completa, revisiones optimistas, validación, backups y recuperación ante contención transitoria.
 
----
+## Modelo central
 
-## ¿En qué se diferencia?
+```text
+texto o código fuente
+        |
+        v
+codificación determinista
+        |
+        v
+glyph vectorial + metadata
+        |
+        v
+superposición en una región
+        |
+        +-- contribuciones de relación unidas y reversibles
+        |
+        v
+resonancia contra un vector de consulta
+        |
+        v
+glyphs, fuentes y contexto cognitivo ordenados
+```
 
-| | RAG | Grafos | Texto plano | **GLIA** |
-|---|---|---|---|---|
-| Almacena | Chunks vectorizados | Nodos + aristas | Texto indexado | **Patrones distribuidos (glyphs)** |
-| Busca por | Similitud coseno | Traversal BFS/DFS | Keywords | **Resonancia (proyección paralela)** |
-| Relaciones | No tiene | Aristas explícitas | No tiene | **Holográficas (codificadas en el vector)** |
-| Si corrompes 30% | Pierde chunks | Pierde caminos | Pierde texto | **Sigue funcionando (propiedad holográfica)** |
-| Razonamiento analógico | No | No | No | **Sí (aritmética vectorial)** |
-| Costo de indexar | Tokens | Tokens | $0 | **$0 (AST parsing)** |
-| Storage | O(N×D) | O(N + E) | O(N) | **O(R×D) constante por región** |
+Una región es la suma de cada vector de glyph ponderado por su magnitud más sus contribuciones de relación. Este invariante se valida antes de cada commit persistente. Los glyphs, relaciones y regiones administrados por el sustrato exponen datos vectoriales inmutables; las APIs de mutación soportadas conservan la superposición regional de forma atómica.
 
----
+GLIA también persiste metadata de glyphs para permitir procedencia, ranking, eliminación por fuente y recuperación exacta. Los vectores regionales tienen dimensión fija, pero la huella durable total incluye metadata de glyphs y relaciones. GLIA no afirma que el tamaño total de la base de datos sea constante al crecer la memoria.
 
-## Capacidades que un grafo NO puede hacer
+## Confiabilidad y escalabilidad
 
-GLIA demuestra operaciones estructuralmente imposibles en un grafo tradicional:
+La implementación actual prioriza un comportamiento predecible ante fallos, escritores concurrentes y crecimiento de memoria.
 
-1. **One-shot learning**: Una sola operación `bind(A, B)` crea una asociación recuperable. Sin entrenamiento iterativo.
-2. **Degradación graceful**: Corrompe 30% de las dimensiones → similitud 0.85. Un grafo con 30% de edges borrados pierde caminos enteros.
-3. **Razonamiento analógico**: `king - man + woman ≈ queen`. Sin edge explícito "king→queen".
-4. **Queries conjuntivas**: Buscar cosas relacionadas a A **Y** B simultáneamente por superposición.
-5. **Storage O(D)**: 500 glyphs en 8KB. Un grafo necesitaría potencialmente 250K edges.
-
-Ejecuta `python examples/demo_v2.py` para ver estas capacidades en acción.
-
----
+- Los commits SQLite usan revisiones optimistas. Un escritor obsoleto se rechaza en vez de sobrescribir conocimiento nuevo.
+- `GliaBrain` recarga y reaplica mutaciones deterministas después de conflictos de revisión.
+- `BEGIN IMMEDIATE` reintenta errores transitorios `SQLITE_BUSY` y `SQLITE_LOCKED` con backoff acotado.
+- El seguimiento de cambios escribe sólo regiones, glyphs y relaciones modificados, mientras la reconciliación de membresía detecta diccionarios limpiados externamente y elimina filas obsoletas de forma exacta.
+- El estado dirty sólo se limpia después de un commit exitoso. Un conflicto o rollback conserva el trabajo pendiente.
+- La carga y el guardado SQLite validan dimensión vectorial, valores finitos, membresía regional, contadores de glyphs y superposición holográfica exacta.
+- Las actualizaciones del escáner y su estado se confirman atómicamente. Los fallos por archivo restauran contribuciones y estado de tracking previos.
+- La resonancia usa una matriz vectorial cacheada e inmutable. Las consultas repetidas evitan reconstruir la matriz y las mutaciones soportadas invalidan el caché.
+- Los backups usan la API de respaldo SQLite y se publican de forma atómica con nombres únicos.
 
 ## Instalación
 
-GLIA se instala **una vez** en tu máquina como herramienta global. Se clona en cualquier ubicación (NO dentro de tu proyecto).
+Requisitos:
 
-**Paso 1: Clonar GLIA**
+- Python 3.11 o posterior
+- NumPy
+- Git para la integración post-commit opcional
+- Una clave de Gemini sólo para `learn` asistido por LLM
 
 ```bash
-# En cualquier lugar de tu máquina
 cd ~/tools
 git clone https://github.com/FelipeFariasAlfaro/glia.git
 cd glia
+python -m venv .venv
+.venv/bin/pip install -e .
+.venv/bin/glia --help
 ```
 
-**Paso 2: Instalar**
+## Inicio rápido
+
+Ejecuta estos comandos dentro del proyecto que quieres que GLIA recuerde.
 
 ```bash
-pip install -e .
-```
-
-**Paso 3: Verificar**
-
-```bash
-python -m glia --version
-# Output: glia, version 0.1.0-alpha
-```
-
-> **Nota Windows:** Si ves un warning de PATH, usa `python -m glia` en vez de `glia`.
-
----
-
-## Uso en tu proyecto
-
-Ve a **tu proyecto** (el que quieres que GLIA recuerde) e inicializa:
-
-**Paso 1: Inicializar**
-
-```bash
-cd /ruta/a/tu/proyecto
+# Inicializar la memoria durable local
 python -m glia init
-```
 
-Crea una carpeta `.glia/` con un `memory.db` vacío. Agrega `.glia/` a tu `.gitignore`.
-
-**Paso 2: Escanear (gratis, instantáneo, sin IA)**
-
-```bash
+# Escanear archivos fuente y documentación compatibles
 python -m glia scan
+
+# Recall estable y de solo lectura
+python -m glia recall "autenticación sesión token"
+
+# Adaptación acotada explícita
+python -m glia recall "autenticación sesión token" --adapt
+
+# Exploración explícita de asociaciones holográficas
+python -m glia recall "autenticación sesión token" --explore
+
+# Inspeccionar almacenamiento durable
+python -m glia doctor --deep
 ```
 
-Parsea todos los archivos con AST. Extrae funciones, clases, imports, docstrings. Crea glyphs en el substrate. Toma segundos, cuesta $0, no necesita API key.
+`recall` es de solo lectura por defecto. Usa `--adapt` sólo cuando quieras persistir refuerzo. Usa `--explore` sólo cuando necesites descubrir asociaciones; el ranking estable no mezcla evidencia de unbinding en sus resultados principales.
 
-**Paso 3: Consultar**
+Para enseñar conocimiento destilado con un LLM, configura estas variables opcionales en el proyecto destino:
 
-```bash
-python -m glia recall "autenticación JWT"
-python -m glia recall "configuración base de datos"
-```
-
-**Paso 4: Enseñar (opcional, usa Gemini Flash)**
-
-```bash
-python -m glia learn "El bug de sesiones era porque el token expiraba en ms en vez de seconds. Fix en auth.py línea 25."
-```
-
-Para esto necesitas un `.env` en tu proyecto:
-```
-GEMINI_API_KEY=tu_key_aqui
+```text
+GEMINI_API_KEY=tu_clave_aqui
 GLIA_MODEL=gemini-3.1-flash-lite-preview
 ```
 
-Obtén tu key gratis en: https://aistudio.google.com/apikey
-
-> **Importante:** La API key solo se necesita para `glia learn`. Los comandos `scan`, `recall`, `stats` y `forget` funcionan **sin API key**.
-
----
-
-## Estructura de carpetas
-
-```
-~/tools/glia/                  ← Código fuente de GLIA (se clona una vez)
-    src/glia/
-    pyproject.toml
-
-~/projects/mi-api/             ← TU proyecto
-    .glia/                     ← Creado por 'glia init' (agregar a .gitignore)
-        memory.db              ← Memoria holográfica de este proyecto
-    .env                       ← Tu API key (agregar a .gitignore)
-    src/
-    ...
-
-~/projects/otro-proyecto/      ← Otro proyecto (memoria separada)
-    .glia/
-        memory.db
-    ...
+```bash
+python -m glia learn "La expiración del token de sesión se expresa en segundos, no en milisegundos."
 ```
 
-Cada proyecto tiene su propia memoria. GLIA se instala una vez y se usa en muchos proyectos.
+## CLI y MCP
 
----
+Comandos CLI útiles:
 
-## ¿Cómo funciona GLIA por dentro?
+| Comando | Propósito |
+|---|---|
+| `python -m glia init` | Crear almacenamiento `.glia` local al proyecto |
+| `python -m glia scan` | Escanear el proyecto incrementalmente |
+| `python -m glia recall "consulta"` | Recuperar resultados de resonancia estables |
+| `python -m glia recall "consulta" --adapt` | Persistir refuerzo acotado |
+| `python -m glia recall "consulta" --explore` | Incluir exploración de asociaciones holográficas |
+| `python -m glia learn "texto"` | Destilar y almacenar conocimiento nuevo |
+| `python -m glia forget` | Aplicar decaimiento temporal |
+| `python -m glia stats` | Informar estadísticas de memoria |
+| `python -m glia doctor --deep` | Ejecutar verificaciones de integridad SQLite |
+| `python -m glia backup` | Crear un backup SQLite durable |
 
-### La analogía: El cerebro no es un disco duro
+GLIA también expone un servidor MCP. Configura el cliente para ejecutar `python -m glia.mcp_server` y define `GLIA_WORKSPACE` con el proyecto destino. Reinicia o reconecta el servidor MCP después de actualizar GLIA para que su proceso cargue la implementación nueva.
 
-Cuando recuerdas el aroma de un pastel, tu cerebro no busca en una carpeta llamada "Recuerdos/Pasteles/aroma.txt". Lo que ocurre es que un estímulo pequeño (el olor) **activa un patrón** de neuronas que, por interferencia, reconstruye el recuerdo completo: la cocina, tu abuela, la conversación que tuviste.
+## Extracción compatible
 
-El conocimiento no está en un punto. Está **distribuido** en un patrón de activación.
-
-GLIA replica este principio computacionalmente.
-
----
-
-### Paso 1: Codificación — Convertir conocimiento en patrones
-
-Cuando GLIA escanea tu proyecto o aprende algo nuevo, convierte cada unidad de conocimiento en un **glyph**: un vector de 1024 dimensiones.
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                                                                  │
-│  "Generate a JWT token for the user"                            │
-│                                                                  │
-│         │ encode_text()                                          │
-│         ▼                                                        │
-│                                                                  │
-│  [0.023, -0.041, 0.087, ..., -0.012, 0.055, 0.031]             │
-│   ←──────────── 1024 dimensiones ──────────────────→            │
-│                                                                  │
-│  Cada dimensión NO tiene significado individual.                 │
-│  El significado está DISTRIBUIDO en el patrón completo.         │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-La codificación es **determinista** — el mismo texto siempre produce el mismo vector. No usa IA, no gasta tokens. Es puro hashing + proyección aleatoria con semilla fija.
-
-**¿Por qué 1024 dimensiones?** En espacios de alta dimensión, vectores aleatorios son casi ortogonales entre sí (similitud ≈ 0). Esto permite almacenar miles de conceptos sin que se "pisen" unos a otros.
-
----
-
-### Paso 2: Almacenamiento — Superposición en el Substrate
-
-Los glyphs no se guardan en filas de una tabla. Se **superponen** (suman) en una región del substrate:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    SUBSTRATE (Región "default")                   │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Glyph 1: "JWT authentication"                                  │
-│  [0.02, -0.04, 0.08, ..., -0.01, 0.05, 0.03]                   │
-│                          +                                       │
-│  Glyph 2: "Token refresh endpoint"                              │
-│  [0.05, 0.01, -0.03, ..., 0.07, -0.02, 0.04]                   │
-│                          +                                       │
-│  Glyph 3: "Session timeout bug"                                 │
-│  [-0.01, 0.06, 0.02, ..., 0.03, 0.08, -0.05]                   │
-│                          =                                       │
-│  ─────────────────────────────────────────────                   │
-│  Región:                                                         │
-│  [0.06, 0.03, 0.07, ..., 0.09, 0.11, 0.02]                     │
-│                                                                  │
-│  ┌─────────────────────────────────────────┐                    │
-│  │ Los 3 glyphs COEXISTEN en el mismo     │                    │
-│  │ vector. No hay filas separadas.         │                    │
-│  │ El tamaño de la región es CONSTANTE     │                    │
-│  │ (1024 floats) sin importar cuántos      │                    │
-│  │ glyphs se almacenen.                   │                    │
-│  └─────────────────────────────────────────┘                    │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**¿Cómo es posible que no se pierdan?** Porque en 1024 dimensiones, vectores aleatorios son casi ortogonales. Cada glyph "vive" en su propia dirección del espacio. Al sumarlos, no se destruyen — coexisten como ondas superpuestas.
-
----
-
-### Paso 3: Relaciones — Codificación holográfica (sin edges)
-
-En un grafo, la relación "A está conectado con B" se almacena como un edge explícito en una tabla. En GLIA, las relaciones se codifican **dentro del mismo espacio vectorial** usando convolución circular:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    BINDING (Convolución Circular)                 │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Concepto A: "generate_token"                                    │
-│  [0.02, -0.04, 0.08, ...]                                       │
-│                                                                  │
-│  Concepto B: "jwt_secret"                                        │
-│  [0.05, 0.01, -0.03, ...]                                       │
-│                                                                  │
-│         bind(A, B) = convolución_circular(A, B)                  │
-│                                                                  │
-│  Resultado: [0.07, -0.02, 0.01, ...]                            │
-│                                                                  │
-│  ┌─────────────────────────────────────────┐                    │
-│  │ Propiedades del binding:                │                    │
-│  │                                         │                    │
-│  │ • bind(A,B) es DISTINTO a A y a B       │                    │
-│  │ • unbind(bind(A,B), A) ≈ B              │                    │
-│  │ • No crea ningún "edge" explícito       │                    │
-│  │ • La relación VIVE en el vector mismo   │                    │
-│  └─────────────────────────────────────────┘                    │
-│                                                                  │
-│  Este binding se SUMA al substrate:                              │
-│  substrate += bind(A, B)                                         │
-│                                                                  │
-│  Ahora, si en el futuro preguntas por A,                        │
-│  el substrate "resuena" también con B                            │
-│  porque su interferencia está codificada ahí.                   │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**No hay tabla de edges. No hay lista de relaciones. Las relaciones son patrones de interferencia dentro del mismo vector.**
-
----
-
-### Paso 4: Recuperación — Resonancia (no búsqueda)
-
-Cuando preguntas algo, GLIA no busca en una tabla. Codifica tu pregunta como vector y lo **proyecta** contra todos los glyphs simultáneamente:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    RESONANCIA                                     │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  Query: "¿por qué expiran los tokens?"                          │
-│         │                                                        │
-│         ▼ encode_text()                                          │
-│  Stimulus: [0.03, -0.02, 0.06, ..., 0.01, 0.04, -0.03]        │
-│         │                                                        │
-│         ▼ comparar contra TODOS los glyphs (paralelo)          │
-│                                                                  │
-│  ┌──────────────────────────────────────────────────────┐       │
-│  │                                                       │       │
-│  │  cosine(stimulus, glyph_1) = 0.69  ← ¡RESUENA!     │       │
-│  │  cosine(stimulus, glyph_2) = 0.13                    │       │
-│  │  cosine(stimulus, glyph_3) = 0.12                    │       │
-│  │  cosine(stimulus, glyph_4) = 0.04                    │       │
-│  │  cosine(stimulus, glyph_5) = 0.02                    │       │
-│  │  ...                                                  │       │
-│  │  cosine(stimulus, glyph_N) = 0.01                    │       │
-│  │                                                       │       │
-│  │  Todos se comparan AL MISMO TIEMPO.                   │       │
-│  │  No hay traversal secuencial.                         │       │
-│  │  No hay "siguiente nodo".                             │       │
-│  │  Es proyección paralela.                              │       │
-│  │                                                       │       │
-│  └──────────────────────────────────────────────────────┘       │
-│                                                                  │
-│  Resultado: Los glyphs que "resuenan" (alta similitud)         │
-│  son los que comparten patrón con tu pregunta.                  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-**La diferencia clave con un grafo:** En un grafo, si no hay un camino de edges entre A y B, nunca los conectas. En GLIA, si A y B comparten patrón (aunque nunca se hayan "conectado" explícitamente), resuenan juntos.
-
----
-
-### Paso 5: Plasticidad — La memoria está viva
-
-Los glyphs no son estáticos. Tienen **magnitud** (volumen) que cambia con el uso:
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                    PLASTICIDAD                                    │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  REFUERZO (Hebbiano): Cada vez que un glyph resuena            │
-│  en una consulta, su magnitud SUBE.                             │
-│                                                                  │
-│  Día 1:  jwt_auth  magnitud: 1.0  ████████████                  │
-│  Día 5:  jwt_auth  magnitud: 1.2  ██████████████  (se usó 4x)  │
-│  Día 10: jwt_auth  magnitud: 1.4  ████████████████ (se usó 8x) │
-│                                                                  │
-│  Los patrones frecuentes "suenan más fuerte" en futuras         │
-│  consultas. Se vuelven más fáciles de encontrar.                │
-│                                                                  │
-│  ─────────────────────────────────────────────────────────────  │
-│                                                                  │
-│  DECAIMIENTO: Los glyphs que NO se usan pierden magnitud.      │
-│                                                                  │
-│  Día 1:  old_framework  magnitud: 1.0  ████████████             │
-│  Día 30: old_framework  magnitud: 0.7  ████████  (no se usó)   │
-│  Día 90: old_framework  magnitud: 0.3  ████     (sigue sin uso)│
-│  Día 180: old_framework magnitud: 0.0  (olvidado)              │
-│                                                                  │
-│  La memoria se AUTO-LIMPIA. Solo sobrevive lo relevante.        │
-│                                                                  │
-│  ─────────────────────────────────────────────────────────────  │
-│                                                                  │
-│  CO-ACTIVACIÓN: Si dos glyphs resuenan juntos en la misma      │
-│  consulta, se crea un binding entre ellos en el substrate.      │
-│                                                                  │
-│  Consulta activa jwt_auth Y session_bug al mismo tiempo         │
-│  → substrate += bind(jwt_auth, session_bug) × 0.02             │
-│  → En futuras consultas, preguntar por uno activará al otro     │
-│                                                                  │
-│  "Lo que resuena junto, se asocia más fuerte."                  │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### Paso 6: El output — Mapa Cognitivo
-
-GLIA no devuelve texto crudo ni archivos completos. Devuelve un **mapa cognitivo** estructurado:
-
-```
-## GLIA Cognitive Map for: "generar token JWT"
-
-### Resonating Patterns (by strength)
-  • [0.69] auth_generate_token: Generate a JWT-like token for the user. (src/auth.py)
-  • [0.13] auth_verify_token: Verify and decode a token. (src/auth.py)
-  • [0.12] module_auth: Authentication module - JWT token management. (src/auth.py)
-  • [0.05] app_login: Authenticate user and return JWT token. (src/app.py)
-
-### Source Files
-  → src/auth.py
-  → src/app.py
-```
-
-El agente recibe:
-- **Qué patrones resonaron** (y con qué fuerza)
-- **Qué significa cada uno** (intención en 1 línea)
-- **Dónde buscar** si necesita más detalle
-
-No recibe bloques de texto para descifrar. Recibe un mapa de navegación.
-
----
-
-### Flujo completo de una sesión
-
-```
-┌─────────────────────────────────────────────────────────────────┐
-│                     SESIÓN DE TRABAJO                             │
-├─────────────────────────────────────────────────────────────────┤
-│                                                                  │
-│  1. MCP Server arranca                                           │
-│     ├──▶ Detecta archivos cambiados (compara hashes)            │
-│     ├──▶ Re-escanea con AST los modificados (gratis)            │
-│     └──▶ Substrate actualizado con nuevos glyphs               │
-│                                                                  │
-│  2. Usuario pregunta: "¿por qué falla el login?"               │
-│     ├──▶ Agente llama glia_recall("login falla")               │
-│     ├──▶ Query se codifica como vector                          │
-│     ├──▶ Resonancia paralela contra todos los glyphs           │
-│     ├──▶ Top-K glyphs resonantes se refuerzan (+magnitud)      │
-│     ├──▶ Co-activación entre los top results                    │
-│     └──▶ Mapa cognitivo devuelto al agente                     │
-│                                                                  │
-│  3. Agente arregla el bug                                        │
-│     ├──▶ Agente llama glia_learn("El login fallaba porque...")  │
-│     ├──▶ Gemini Flash destila en conceptos                      │
-│     ├──▶ Cada concepto se codifica como glyph                  │
-│     ├──▶ Relaciones se codifican como bindings                  │
-│     └──▶ Todo se superpone en el substrate                      │
-│                                                                  │
-│  4. Dev hace commit                                              │
-│     ├──▶ Git hook captura mensaje + archivos                    │
-│     └──▶ Se registra como conocimiento histórico                │
-│                                                                  │
-│  5. Pasa el tiempo sin usar ciertos conceptos                   │
-│     ├──▶ Decaimiento reduce magnitud de glyphs no usados       │
-│     └──▶ Glyphs con magnitud 0 se olvidan efectivamente       │
-│                                                                  │
-│  ═══════════════════════════════════════════════════════════     │
-│  RESULTADO: La memoria CRECE con lo relevante                    │
-│             y OLVIDA lo obsoleto — automáticamente               │
-│  ═══════════════════════════════════════════════════════════     │
-│                                                                  │
-└─────────────────────────────────────────────────────────────────┘
-```
-
----
-
-### ¿Por qué esto NO es un grafo?
-
-| Propiedad | Grafo | GLIA |
-|---|---|---|
-| Estructura | Nodos + Aristas explícitas | Vectores superpuestos en un espacio continuo |
-| Relaciones | Tabla de edges | Patrones de interferencia (bindings) |
-| Recuperación | Traversal secuencial (BFS/DFS) | Proyección paralela (cosine similarity) |
-| Si borras 30% | Pierdes caminos completos | Sigue funcionando (propiedad holográfica) |
-| Analogías | Imposible | Nativo (aritmética vectorial) |
-| Storage | Crece con cada relación (O(N²)) | Constante por región (O(D)) |
-| Tabla de edges en DB | Sí | **NO** |
-
-Si abres el `memory.db` de GLIA, encontrarás tablas `substrate_regions` y `glyphs`. **No encontrarás ninguna tabla de edges o relaciones.** Las relaciones no existen como registros — existen como interferencias matemáticas dentro de los vectores.
-
----
+El escáner extrae estructura útil de Python, JavaScript, TypeScript, Java, Go, Rust, C#, C/C++, Ruby, PHP, Kotlin, Swift, Gherkin, Markdown, texto y archivos de configuración frecuentes. Usa identidades calificadas por fuente, por lo que archivos con el mismo nombre base no colisionan.
 
 ## Benchmarks
 
-GLIA fue evaluado contra Graph (Spreading Activation) y BM25 (Elasticsearch) en tres proyectos de dominios distintos, usando métricas estándar de Information Retrieval (MRR, nDCG, Precision@K) con conteo real de tokens (tiktoken).
+El benchmark reproducible de fase 2 compara GLIA con recuperación HDM directa, Okapi BM25 y SQLite FTS5 sobre juicios de relevancia versionados. También mide persistencia y escalado de consultas de forma local.
 
-### Resultados (modo local, $0, sin embeddings)
-
-| Proyecto | GLIA | Graph (SA) | BM25 | GLIA vs Graph |
-|----------|------|-----------|------|---------------|
-| E-Commerce (Python, 31 archivos) | MRR **0.771** | 0.409 | 0.785 | **+88%** |
-| ML Pipeline (Python, 27 archivos) | MRR **0.904** | 0.203 | 0.941 | **+344%** |
-| Frontend (TypeScript, 32 archivos) | MRR **0.877** | 0.421 | 0.885 | **+108%** |
-
-### Eficiencia
-
-| Métrica | Valor promedio |
-|---------|---------------|
-| Token savings | **97.8%** (compresión 47x) |
-| Latencia | **94ms** promedio |
-| Scan | **3.4s** promedio, $0 |
-| Edges | **0** (holográfico) |
-
-### GLIA vs RAG (Gemini Embeddings)
-
-| Sistema | MRR | Costo |
-|---------|-----|-------|
-| RAG (Gemini embedding-001) | 0.873 | ~$0.001/query |
-| **GLIA (local)** | 0.783 | **$0** |
-| GLIA + embeddings (opcional) | 0.835 | ~$0.001/query |
-
-**Conclusión:** GLIA supera a grafos tradicionales por 2.5x. Iguala a BM25 (-2.2%). Pierde contra RAG en precisión pura (-10%) pero a $0 de costo y con capacidades que RAG no tiene (plasticidad, unbinding, offline).
-
-### 🛡️ Integridad Metodológica
-
-Nuestros benchmarks no son estimaciones; son pruebas rigurosas diseñadas bajo estándares de Information Retrieval:
-1. **Evaluación Zero-Shot:** GLIA no fue pre-entrenado en los proyectos de prueba. Todas las evaluaciones son *zero-shot* usando el escáner AST estándar.
-2. **Métricas de Industria:** Usamos **MRR** (Mean Reciprocal Rank) y **nDCG** en lugar de métricas subjetivas, garantizando que el orden y la precisión del contexto entregado son óptimos para el LLM.
-3. **Cálculo Real de Tokens:** El ahorro del 97% no es una aproximación (caracteres / 4). Se mide usando `tiktoken` (cl100k_base), reflejando exactamente el impacto en tu factura de API.
-4. **Reproducibilidad:** Todos los scripts de evaluación (`run_benchmark_v2.py`) y los repositorios de prueba (e-commerce, ML pipeline, frontend) están incluidos en el repositorio para verificación pública.
-
-📊 [Ver benchmarks completos](docs/benchmarks/BENCHMARK_SUMMARY.md)
-
----
-
-## Comandos CLI
-
-| Comando | Qué hace | Costo |
-|---|---|---|
-| `python -m glia init` | Inicializar GLIA en el directorio actual | Gratis |
-| `python -m glia scan` | Escanear proyecto con AST (todos los lenguajes) | Gratis |
-| `python -m glia recall "query"` | Recuperar por resonancia | Gratis |
-| `python -m glia learn "texto"` | Enseñar conocimiento nuevo (destilación IA) | Tokens |
-| `python -m glia stats` | Estadísticas de la memoria | Gratis |
-| `python -m glia forget` | Aplicar decaimiento temporal | Gratis |
-| `python -m glia changes` | Detectar archivos modificados manualmente | Gratis |
-| `python -m glia hook` | Instalar git hook post-commit | Gratis |
-| `python -m glia serve` | Iniciar servidor MCP | Gratis |
-| `python -m glia context "query"` | Obtener contexto crudo para inyectar en LLM | Gratis |
-
----
-
-## Integración MCP (IDE / CLI)
-
-GLIA se expone como servidor MCP compatible con cualquier cliente MCP.
-
-### Cline (VS Code)
-
-En la configuración MCP de Cline:
-
-```json
-{
-  "mcpServers": {
-    "glia": {
-      "command": "python",
-      "args": ["-m", "glia.mcp_server"],
-      "env": {
-        "GLIA_WORKSPACE": "C:\\ruta\\a\\tu\\proyecto",
-        "GEMINI_API_KEY": "tu_key",
-        "GLIA_MODEL": "gemini-3.1-flash-lite-preview"
-      }
-    }
-  }
-}
-```
-
-### Gemini CLI
-
-Crear `.gemini/settings.json` en tu proyecto:
-
-```json
-{
-  "mcpServers": {
-    "glia": {
-      "command": "python",
-      "args": ["-m", "glia.mcp_server"],
-      "env": {
-        "GLIA_WORKSPACE": ".",
-        "GEMINI_API_KEY": "tu_key",
-        "GLIA_MODEL": "gemini-3.1-flash-lite-preview"
-      }
-    }
-  }
-}
-```
-
-### Claude Desktop
-
-Editar `%APPDATA%\Claude\claude_desktop_config.json` (Windows) o `~/Library/Application Support/Claude/claude_desktop_config.json` (Mac):
-
-```json
-{
-  "mcpServers": {
-    "glia": {
-      "command": "python",
-      "args": ["-m", "glia.mcp_server"],
-      "env": {
-        "GLIA_WORKSPACE": "/ruta/a/proyecto",
-        "GEMINI_API_KEY": "tu_key"
-      }
-    }
-  }
-}
-```
-
-### Cursor
-
-Crear `.cursor/mcp.json` en la raíz del proyecto:
-
-```json
-{
-  "mcpServers": {
-    "glia": {
-      "command": "python",
-      "args": ["-m", "glia.mcp_server"],
-      "env": {
-        "GLIA_WORKSPACE": ".",
-        "GEMINI_API_KEY": "tu_key"
-      }
-    }
-  }
-}
-```
-
----
-
-## Herramientas MCP disponibles
-
-| Herramienta | Descripción | Costo |
-|---|---|---|
-| `glia_recall(query, top_k)` | Recuperar contexto por resonancia | Gratis |
-| `glia_learn(content, source)` | Enseñar conocimiento nuevo | Tokens |
-| `glia_scan(path)` | Escanear proyecto con AST | Gratis |
-| `glia_learn_file(file_path)` | Re-escanear un archivo específico | Gratis |
-| `glia_stats()` | Estadísticas de memoria | Gratis |
-| `glia_forget(decay_rate)` | Aplicar decaimiento temporal | Gratis |
-| `glia_changes()` | Detectar archivos modificados | Gratis |
-
----
-
-## Lenguajes soportados
-
-El scanner AST extrae funciones, clases, métodos, imports y dependencias de:
-
-Python • JavaScript • TypeScript • Java • Go • Rust • C# • C/C++ • Ruby • PHP • Kotlin • Swift • Gherkin (.feature) • Markdown • Archivos de configuración (JSON, YAML, TOML)
-
----
-
-## Cómo funciona
-
-GLIA usa **Memoria Holográfica Distribuida** basada en Vector Symbolic Architectures (VSA):
-
-1. **Codificación**: Texto/código → vector de 1024 dimensiones (determinista, sin IA)
-2. **Almacenamiento**: Glyphs se superponen en regiones del substrate (suma vectorial)
-3. **Relaciones**: Codificadas holográficamente via convolución circular (sin edges)
-4. **Recuperación**: Query → vector → similitud coseno contra todos los glyphs (paralelo)
-5. **Plasticidad**: Patrones usados se refuerzan, los no usados decaen
-
-```
-Query: "generar token JWT"
-         │
-         ▼ encode_text()
-    [vector 1024-d]
-         │
-         ▼ resonate() — comparación paralela
-         │
-    ┌────┴────────────────────────────────────────┐
-    │  auth_generate_token  (0.69)  ← resonó!     │
-    │  auth_verify_token    (0.13)                 │
-    │  module_auth          (0.12)                 │
-    │  app_login            (0.05)                 │
-    └─────────────────────────────────────────────┘
-```
-
-Ver [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) para diagramas detallados.
-
----
-
-## Flujo de trabajo recomendado
+Ejecútalo así:
 
 ```bash
-# Setup inicial (una vez)
-python -m glia init
-python -m glia scan
-python -m glia hook
-# Configurar MCP en tu IDE
-
-# Después trabaja normalmente — GLIA aprende automáticamente:
-# • El agente llama glia_learn después de arreglar bugs o tomar decisiones
-# • El git hook captura mensajes de commit
-# • Archivos modificados se re-escanean al reconectar el MCP server
+.venv/bin/python benchmarks/benchmark_phase2.py --sizes 100 1000 5000 --query-count 10
 ```
 
----
+Resultados locales finales de fase 3 con 5.000 glyphs:
 
-## Demo (sin API key)
+| Métrica | Resultado |
+|---|---:|
+| Guardado inicial completo | 180,08 ms |
+| Guardado incremental validado de un glyph | 26,26 ms |
+| Filas cambiadas en ese guardado incremental | 1 región y 1 glyph |
+| Consulta fría, incluida la construcción de matriz | 32,13 ms |
+| Consulta caliente con caché | 6,10 ms |
+| Recall público estable | 7,10 ms |
+| Recall adaptativo | 65,13 ms |
+| Tamaño SQLite, WAL y SHM | 86.047 KiB |
 
-```bash
-python examples/demo_v2.py
-```
+El MRR de recuperación en el mismo benchmark fue 0,837 para el fixture backend, 0,802 para ML y 0,776 para TypeScript/React. BM25 y FTS5 siguen siendo baselines léxicos más fuertes y rápidos para recuperación por términos exactos; el valor diferencial de GLIA es la resonancia HDM persistente, el binding reversible, la plasticidad acotada, el escaneo con procedencia y la exploración de asociaciones.
 
-Demuestra: resonancia, one-shot learning, degradación graceful, razonamiento analógico, queries conjuntivas y eficiencia de storage.
+Los tiempos dependen del hardware y del estado del proceso. La calidad se mide con juicios de relevancia versionados, no se infiere durante cada ejecución.
 
----
+## Notas operativas
 
-## Requisitos
-
-- **Python 3.11+**
-- **numpy**
-- **Git** (para el hook automático)
-- **Gemini API Key** (opcional — solo para `glia learn`)
-
----
-
-## Estructura del proyecto
-
-```
-glia/
-├── src/glia/
-│   ├── binding.py           # Convolución circular (bind/unbind)
-│   ├── encoder.py           # Codificación determinista texto→vector
-│   ├── synonyms.py          # Diccionario de sinónimos de programación
-│   ├── substrate.py         # Regiones de memoria con superposición
-│   ├── resonance.py         # Recuperación por proyección paralela + unbinding
-│   ├── plasticity.py        # Refuerzo Hebbiano + decaimiento temporal
-│   ├── cognitive_map.py     # Output estructurado para LLMs
-│   ├── brain.py             # Orquestador principal
-│   ├── storage.py           # Persistencia SQLite (sin tabla de edges)
-│   ├── embeddings.py        # Embeddings opcionales (Gemini, modo enhanced)
-│   ├── distiller.py         # Destilación con LLM (Gemini Flash)
-│   ├── ast_scanner_v2.py    # Scanner multi-lenguaje para substrate
-│   ├── scanner.py           # Scanner de proyecto (incremental)
-│   ├── mcp_server.py        # Servidor MCP
-│   └── cli.py               # Interfaz de línea de comandos
-├── docs/
-│   ├── ARCHITECTURE.md      # Arquitectura detallada con diagramas
-│   └── benchmarks/          # Resultados de benchmarks
-├── benchmarks/              # Scripts de benchmark reproducibles
-├── examples/
-│   └── demo_v2.py           # Demo de capacidades holográficas
-└── benchmark_project*/      # Proyectos de prueba para benchmarks
-```
-
----
-
-## Troubleshooting
-
-**"glia" no se reconoce** → Usa `python -m glia` o agrega Python Scripts al PATH.
-
-**El MCP server no conecta** → Verifica que `python -m glia.mcp_server` corre sin errores. Verifica que `GLIA_WORKSPACE` apunta a un directorio con `.glia/` inicializado.
-
-**"No resonating patterns"** → Ejecuta `python -m glia scan` primero, luego `python -m glia stats` para verificar que hay glyphs.
-
-**"resource busy or locked"** → Desconecta el MCP server en tu IDE antes de borrar `.glia/`.
-
----
-
-## Autor
-
-**Felipe Farías Alfaro**
-- GitHub: [FelipeFariasAlfaro](https://github.com/FelipeFariasAlfaro)
-- Web: [felipefariasalfaro.github.io](https://felipefariasalfaro.github.io)
-
----
+- Agrega `.glia/` al `.gitignore` del proyecto destino, salvo que quieras compartir intencionalmente la base de memoria.
+- No edites archivos SQLite mientras un servidor MCP o comando CLI está escribiendo. GLIA reintenta locks transitorios, pero deben evitarse transacciones externas largas.
+- Usa `glia doctor --deep` para diagnosticar preocupaciones de persistencia.
+- Usa `glia backup` antes de mover, inspeccionar manualmente o recuperar memoria del proyecto.
+- Si un servidor MCP sigue ejecutando código antiguo después de una actualización, reconéctalo desde el cliente MCP.
 
 ## Licencia
 
-[MIT](LICENSE)
+GLIA se distribuye bajo la [Licencia MIT](LICENSE).

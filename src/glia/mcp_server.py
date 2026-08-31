@@ -9,7 +9,10 @@ import sys
 from pathlib import Path
 
 from dotenv import load_dotenv
-from mcp.server.fastmcp import FastMCP
+try:
+    from mcp.server.mcpserver import MCPServer as FastMCP
+except ImportError:
+    from mcp.server.fastmcp import FastMCP
 
 load_dotenv()
 
@@ -37,7 +40,12 @@ mcp = FastMCP(
 
 
 @mcp.tool()
-def glia_recall(query: str, top_k: int = 10) -> str:
+def glia_recall(
+    query: str,
+    top_k: int = 10,
+    adapt: bool = False,
+    explore: bool = False,
+) -> str:
     """
     Recall associated knowledge from GLIA's memory via spreading activation.
 
@@ -49,11 +57,18 @@ def glia_recall(query: str, top_k: int = 10) -> str:
     Args:
         query: The concept, question, or topic to recall (e.g. "auth token", "database config")
         top_k: Maximum number of nodes to activate (default 10)
+        adapt: Persist bounded Hebbian reinforcement (default false)
+        explore: Include holographic association discovery in the result tail
 
     Returns:
         Associated context reconstructed from the memory graph.
     """
-    result = brain.recall(query, top_k=top_k)
+    result = brain.recall(
+        query,
+        top_k=top_k,
+        adapt=adapt,
+        explore=explore,
+    )
     return result["context"] or "No associations found in memory for this query."
 
 

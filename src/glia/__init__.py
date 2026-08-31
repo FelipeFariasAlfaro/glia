@@ -1,3 +1,3 @@
-"""GLIA - Associative Memory with Spreading Activation for AI Agents."""
+"""GLIA - Holographic Distributed Memory for AI Agents."""
 
-__version__ = "0.1.0-alpha"
+__version__ = "0.2.0a0"
